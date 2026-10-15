@@ -165,14 +165,18 @@ class NewsContext:
                     names.append(competition)
         return [name for name in names if name]
 
-    def _search_query(self, days=3):
+    def _search_queries(self, days=3):
         year = self._season_year()
-        terms = list(dict.fromkeys([*self._teams(), *self._player_names(), *self._competition_names(year), str(year)]))
-        terms = [term.replace('"', '') for term in terms if term]
-        quoted = ' OR '.join(f'"{term}"' for term in terms)
+        categories = {'times': self._teams(), 'jogadores': self._player_names(),
+                      'competições': [*self._competition_names(year), str(year)]}
         sites = ' OR '.join(f'site:{domain}' for domain in self._domains())
         start_of_year = f'{year}-01-01'
-        return f'({quoted}) ({sites}) after:{start_of_year} when:3d'
+        queries = {}
+        for category, terms in categories.items():
+            quoted = ' OR '.join('"' + term.replace('"', '') + '"' for term in dict.fromkeys(terms) if term)
+            if quoted:
+                queries[category] = f'({quoted}) ({sites}) after:{start_of_year} when:3d'
+        return queries
 
     @staticmethod
     def _facts(articles):
@@ -198,13 +202,22 @@ class NewsContext:
             match_key = self._current_match_key()
             if not match_key:
                 raise HTTPException(400, 'Carregue uma partida antes de buscar notícias.')
-            params = {'q': self._search_query(days), 'hl': 'pt-BR', 'gl': 'BR', 'ceid': 'BR:pt-419'}
+            queries = self._search_queries(days)
+            common_params = {'hl': 'pt-BR', 'gl': 'BR', 'ceid': 'BR:pt-419'}
             try:
                 async with httpx.AsyncClient(timeout=20, follow_redirects=True, trust_env=False) as client:
-                    response = await client.get('https://news.google.com/rss/search', params=params,
-                                                headers={'User-Agent': 'FutebolLiveOverlay/1.0 RSS reader'})
-                response.raise_for_status()
-                root = ET.fromstring(response.content)
+                    responses = await asyncio.gather(*(
+                        client.get('https://news.google.com/rss/search', params={**common_params, 'q': query},
+                                   headers={'User-Agent': 'FutebolLiveOverlay/1.0 RSS reader'})
+                        for query in queries.values()), return_exceptions=True)
+                roots = []
+                for response in responses:
+                    if isinstance(response, Exception):
+                        continue
+                    response.raise_for_status()
+                    roots.append(ET.fromstring(response.content))
+                if not roots:
+                    raise httpx.RequestError('Nenhuma consulta RSS respondeu.')
             except (httpx.HTTPError, ET.ParseError, ValueError) as exc:
                 self.state['news_context'] = {**self.status(), 'error': 'Não foi possível consultar os feeds gratuitos. Confira sua conexão e tente novamente.'}
                 raise HTTPException(502, self.state['news_context']['error']) from exc
@@ -212,7 +225,8 @@ class NewsContext:
             domains, articles, seen = self._domains(), [], set()
             fresh_after = datetime.now(timezone.utc) - timedelta(days=3)
             fresh_before = datetime.now(timezone.utc) + timedelta(minutes=5)
-            for item in root.findall('./channel/item'):
+            items = [item for root in roots for item in root.findall('./channel/item')]
+            for item in items:
                 title = self.clean(item.findtext('title'), 220)
                 url = self.clean(item.findtext('link'), 800)
                 source_node = item.find('source')
@@ -234,7 +248,10 @@ class NewsContext:
                 articles.append({'title': title, 'url': url, 'source': source, 'publisher_url': source_url,
                                  'trust': self.trust_label(source_url),
                                  'published_at': published_at,
-                                 'description': ''})
+                                 'description': '', 'categories': [category for category, query in queries.items()
+                                                                  if any(term.casefold() in title.casefold() for term in
+                                                                         (self._teams() if category == 'times' else self._player_names() if category == 'jogadores' else self._competition_names(self._season_year())))]})
+            articles.sort(key=lambda item: item['published_at'], reverse=True)
             if match_key != self._current_match_key():
                 return self.status()
             facts = self._facts(articles) if self.settings['include_in_voice'] else []
@@ -245,7 +262,8 @@ class NewsContext:
                                           'automatic': automatic, 'source_domains': domains,
                                           'player_terms': self._player_names(),
                                           'competition_terms': self._competition_names(self._season_year()),
-                                          'season_year': self._season_year(), 'max_age_days': 3}
+                                          'season_year': self._season_year(), 'max_age_days': 3,
+                                          'search_categories': list(queries)}
             if self.broadcast:
                 await self.broadcast()
             return self.status()
