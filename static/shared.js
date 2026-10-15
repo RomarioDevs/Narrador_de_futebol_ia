@@ -2,6 +2,11 @@ const $=id=>document.getElementById(id);
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const statNames={possession:'Posse de bola',shots:'Finalizações',shots_on:'No gol',passes:'Passes',pass_accuracy:'Precisão de passe',fouls:'Faltas',corners:'Escanteios',offsides:'Impedimentos',saves:'Defesas',yellow:'Cartões amarelos',red:'Cartões vermelhos'};
 function formBadges(history){return history.map(g=>`<span class="form-result ${g.result==='V'?'win':g.result==='D'?'loss':'draw'}" title="${({V:'Vitória',D:'Derrota',E:'Empate'})[g.result]||'Resultado não informado'} · ${esc(g.date)} · ${esc(g.opponent)} · ${esc(g.score)} · ${esc(g.competition)}">${esc(g.result)}</span>`).join('')}
+function matchCoach(s,side){
+ const values=[s?.ge?.ready?s.ge.coaches?.[side]:null,s?.coaches?.[side],s?.lineups?.[side]?.coach,s?.coach_overrides?.[side],s?.catalog_coaches?.[side]];
+ for(const value of values){if(typeof value==='string'&&value.trim())return {name:value.trim()};if(value&&typeof value.name==='string'&&value.name.trim())return value;}
+ return null;
+}
 function playerRows(players){return players.map(p=>`<div class="player"><span class="shirt-number">${esc(p.number)||'—'}</span><span class="player-name">${esc(p.name)}</span><span class="player-position">${esc(p.position)}</span><span class="player-flags">${p.subbed_in?'<span title="Entrou em campo">↗</span>':''}${p.subbed_out?'<span title="Substituído">↙</span>':''}${p.yellow?`<span title="${p.yellow} cartão(ões) amarelo(s)" class="card-icon"></span>${p.yellow>1?p.yellow:''}`:''}${p.red?'<span title="Cartão vermelho" class="card-icon red"></span>':''}</span></div>`).join('')}
 function pregameState(s){
  renderSupportCredit(s);

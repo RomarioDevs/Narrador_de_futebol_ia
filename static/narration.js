@@ -49,7 +49,7 @@ class MatchNarrator {
  }
  notify(status=this.status) {
   this.status=status;
-  const describe=item=>item?{text:item.text.slice(0,900),kind:item.kind,role:item.kind==='analysis'?'Comentarista':'Narrador',label:item.lineup?'Escalação':item.script?'Roteiro':item.engagement?'Like e inscrição':item.replay?'Repetição':''}:null;
+  const describe=item=>item?{text:item.text.slice(0,900),kind:item.kind,role:item.kind==='analysis'?'Comentarista':'Narrador',label:item.lineup?'Escala\u00e7\u00e3o':item.script?'Roteiro':item.engagement?'Like e inscri\u00e7\u00e3o':'',lineup_side:item.lineup?item.lineup_side:null,lineup_role:item.lineup?item.lineup_role:null,lineup_index:item.lineup?item.lineup_index:null,lineup_total:item.lineup?item.lineup_total:null}:null;
   this.onChange({enabled:this.enabled,active:this.enabled||this.previewing,paused:this.paused,status,lastText:this.lastText,lastSource:this.lastSource,
    current:describe(this.utterance?this.currentItem:this.composing?.item),queue:[...this.queue,...this.lineupQueue].slice(0,40).map(describe),can_repeat:!!this.lastEvent});
  }
@@ -368,15 +368,20 @@ class MatchNarrator {
  scheduleLineups(s,force=false){
   if(!this.enabled||this.paused||(s.phase==='post'&&!force)||(!this.announceLineups&&!force))return;
   for(const side of ['home','away']){
-   const group=s.lineups?.[side],players=group?.starters||[];
+   const group=s.lineups?.[side],players=typeof currentPlayers==='function'?currentPlayers(group||{}):(group?.starters||[]);
    if(!players.length||(!force&&this.lineupsSeen.has(side)))continue;
-   // Wait for the complete eleven before automatically announcing the initial lineup.
-   if(!force&&players.length!==11)continue;
+   // Only trigger the automatic reading after the source has provided a complete starting eleven.
+   if(!force&&(group?.starters||[]).length!==11)continue;
    this.lineupsSeen.add(side);
-   for(let index=0;index<players.length;index+=3){
-    const intro=index===0?`Escalação inicial informada do ${s[side].name}. `:`Seguindo a escalação do ${s[side].name}. `;
-    const text=intro+players.slice(index,index+3).map(p=>`${p.name}${p.number?`, camisa ${p.number}`:''}, ${this.position(p.position)}${p.captain?', capitão':''}`).join('. ')+'.';
-    this.lineupQueue.push({text,kind:'analysis',lineup:true,manualLineup:force,created:Date.now()});
+   const coach=typeof matchCoach==='function'?matchCoach(s,side):null;
+   if(coach?.name){
+    const text=`Escala\u00e7\u00e3o informada do ${s[side].name}. No comando da equipe, o t\u00e9cnico ${coach.name}.`;
+    this.lineupQueue.push({text,kind:'analysis',lineup:true,lineup_side:side,lineup_role:'coach',lineup_index:null,lineup_total:players.length,manualLineup:force,created:Date.now()+this.lineupQueue.length/1000});
+   }
+   for(let index=0;index<players.length;index++){
+    const player=players[index],intro=index===0&&!coach?.name?`Escala\u00e7\u00e3o informada do ${s[side].name}. `:'';
+    const text=intro+`${player.name}${player.number?`, camisa ${player.number}`:''}, ${this.position(player.position)}${player.captain?', capit\u00e3o':''}.`;
+    this.lineupQueue.push({text,kind:'analysis',lineup:true,lineup_side:side,lineup_role:'player',lineup_index:index,lineup_total:players.length,manualLineup:force,created:Date.now()+this.lineupQueue.length/1000});
    }
   }
   if(this.lineupQueue.length)this.pump();

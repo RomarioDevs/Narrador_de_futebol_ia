@@ -35,6 +35,30 @@ function updateLeagueTable(s){
  drawLeagueTable();
 }
 setInterval(()=>{if(leagueScene==='table'&&leaguePages.length>1){leaguePage=(leaguePage+1)%leaguePages.length;drawLeagueTable()}},12000);
+let lineupReadProgress=null;
+function updateLineupReadAnimation(s){
+ const layer=$('lineupReadAnimation');if(!layer)return;
+ const matchKey=JSON.stringify([s.competition,s.home?.name,s.away?.name,s.kickoff||'']);
+ if(lineupReadProgress&&lineupReadProgress.matchKey!==matchKey)lineupReadProgress=null;
+ const playback=s.narration_playback||{},current=playback.current;
+ const isLineup=item=>item?.label==='Escala\u00e7\u00e3o'&&(item.lineup_side==='home'||item.lineup_side==='away')&&['coach','player'].includes(item.lineup_role||'player');
+ if(isLineup(current)&&(current.lineup_role==='coach'||Number.isInteger(current.lineup_index))){
+  lineupReadProgress={matchKey,side:current.lineup_side,role:current.lineup_role||'player',index:current.lineup_index,total:current.lineup_total};
+ }
+ const queued=(playback.queue||[]).some(isLineup),reading=isLineup(current);
+ if(!reading&&!queued)lineupReadProgress=null;
+ if(!lineupReadProgress){layer.hidden=true;layer.replaceChildren();layer.dataset.progress='';layer.classList.remove('lineup-read-scene');return;}
+ layer.hidden=false;
+ const scene=s.appearance?.scene||'match',signature=JSON.stringify([lineupReadProgress,scene]);
+ if(layer.dataset.progress===signature)return;
+ layer.dataset.progress=signature;
+ if(scene==='formation'){
+  layer.classList.add('lineup-read-scene');
+  layer.innerHTML=`<div class="lineup-read-field-scene">${formationIntroHTML(s,lineupReadProgress,'field')}</div><div class="lineup-read-card-scene">${formationIntroHTML(s,lineupReadProgress,'person')}</div>`;
+ }else{
+  layer.classList.remove('lineup-read-scene');layer.innerHTML=formationIntroHTML(s,lineupReadProgress);
+ }
+}
 function render(s){
  s=pregameState(s);
  updateLeagueTable(s);
@@ -50,6 +74,7 @@ function render(s){
  $('overlayLineups').innerHTML=lineupHTML(s,a.scene==='bench'?'bench':'field');
  $('matchLineupRows').innerHTML=formationHTML(s);
  if(typeof matchAnimation!=='undefined')matchAnimation.update(s);
+ updateLineupReadAnimation(s);
  $('contextBand').innerHTML=['home','away'].map(side=>{const t=s.standings?.[side],history=s.recent_form?.[side]||[];return `<div class="context-team"><strong>${esc(s[side].name)}</strong><span class="context-rank">${t?.rank?esc(t.rank)+'º · '+esc(t.points??'—')+' pts':'Classificação indisponível'}</span><span class="form-label">ÚLTIMOS 5</span><div class="form-badges">${history.length?formBadges(history):'<small>Não informados</small>'}</div></div>`}).join('')+'<div class="context-caption">V vitória · E empate · D derrota · mais recente primeiro · últimos jogos em todas as competições · classificação informada pela fonte</div>';
  $('bookings').innerHTML=(s.cards||[]).length?'<span class="eyebrow">CARTÕES NA PARTIDA</span><div class="booking-list">'+s.cards.slice(-4).reverse().map(c=>`<div><span class="card-icon ${c.color==='red'?'red':''}"></span> ${esc(c.player)} <small>${esc(c.minute)}′ · ${esc(c.team)}</small></div>`).join('')+'</div>':'';
  const top=s.youtube_chat?.top_players_by_window?.['15']||s.youtube_chat?.top_players||[];$('chatRanking').hidden=!top.length;$('chatRankingItems').innerHTML=top.map((item,index)=>`<div class="chat-rank-item"><span>${index+1}º</span><strong>${esc(item.name)}</strong><small>${item.count} menção(ões)</small></div>`).join('');

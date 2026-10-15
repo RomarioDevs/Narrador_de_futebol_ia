@@ -166,17 +166,57 @@ class NewsContext:
                     names.append(competition)
         return [name for name in names if name]
 
+    @staticmethod
+    def _normalize_term(value):
+        import unicodedata
+        value = unicodedata.normalize('NFKD', str(value or '').casefold())
+        value = ''.join(char for char in value if not unicodedata.combining(char))
+        return re.sub(r'[^a-z0-9]+', ' ', value).strip()
+
+    def _relevance_terms(self):
+        aliases = {
+            'flamengo': ['Flamengo', 'rubro negro carioca'],
+            'estudiantes de la plata': ['Estudiantes de La Plata', 'Estudiantes', 'Pincha'],
+            'fluminense': ['Fluminense', 'Tricolor das Laranjeiras'],
+            'palmeiras': ['Palmeiras', 'Verdao'],
+            'corinthians': ['Corinthians', 'Timao'],
+            'sao paulo': ['Sao Paulo', 'Tricolor Paulista'],
+            'gremio': ['Gremio'],
+            'internacional': ['Internacional', 'Inter de Porto Alegre'],
+            'botafogo': ['Botafogo', 'Fogao'],
+        }
+        team_terms = []
+        for team in self._teams():
+            team_terms.append(team)
+            team_terms.extend(aliases.get(self._normalize_term(team), []))
+        competitions = self._competition_names(self._season_year())
+        competition_terms = list(competitions)
+        for competition in competitions:
+            normalized = self._normalize_term(competition)
+            if 'libertadores' in normalized:
+                competition_terms.extend(['Libertadores', 'Copa Libertadores', 'CONMEBOL Libertadores'])
+            elif 'brasileirao' in normalized or 'serie a' in normalized:
+                competition_terms.extend(['Brasileirao', 'Campeonato Brasileiro Serie A'])
+        unique = lambda values: list(dict.fromkeys(term for term in values if term))
+        return {'times': unique(team_terms), 'jogadores': unique(self._player_names()),
+                'competicoes': unique(competition_terms)}
+
+    def _article_categories(self, title):
+        normalized = ' ' + self._normalize_term(title) + ' '
+        categories = []
+        for category, candidates in self._relevance_terms().items():
+            if any(' ' + self._normalize_term(term) + ' ' in normalized for term in candidates):
+                categories.append(category)
+        return categories
+
     def _search_queries(self, days=3):
-        year = self._season_year()
-        categories = {'times': self._teams(), 'jogadores': self._player_names(),
-                      'competições': [*self._competition_names(year), str(year)]}
+        categories = self._relevance_terms()
         sites = ' OR '.join(f'site:{domain}' for domain in self._domains())
-        start_of_year = f'{year}-01-01'
         queries = {}
         for category, terms in categories.items():
             quoted = ' OR '.join('"' + term.replace('"', '') + '"' for term in dict.fromkeys(terms) if term)
             if quoted:
-                queries[category] = f'({quoted}) ({sites}) after:{start_of_year} when:3d'
+                queries[category] = f'({quoted}) ({sites}) when:3d'
         return queries
 
     @staticmethod
@@ -245,6 +285,9 @@ class NewsContext:
                     continue
                 if not source_url or not any(host == domain or host.endswith('.' + domain) for domain in domains):
                     continue
+                categories = self._article_categories(title)
+                if not categories:
+                    continue
                 normalized = title.casefold()
                 if normalized in seen:
                     continue
@@ -252,9 +295,7 @@ class NewsContext:
                 articles.append({'title': title, 'url': url, 'source': source, 'publisher_url': source_url,
                                  'trust': self.trust_label(source_url),
                                  'published_at': published_at,
-                                 'description': '', 'categories': [category for category, query in queries.items()
-                                                                  if any(term.casefold() in title.casefold() for term in
-                                                                         (self._teams() if category == 'times' else self._player_names() if category == 'jogadores' else self._competition_names(self._season_year())))]})
+                                 'description': '', 'categories': categories})
             articles.sort(key=lambda item: item['published_at'], reverse=True)
             if match_key != self._current_match_key():
                 return self.status()

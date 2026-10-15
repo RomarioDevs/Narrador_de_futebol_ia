@@ -19,19 +19,22 @@ function formationTeamColors(team={},appearance={},side='home'){
  const secondary=valid(team.alternate_color)?team.alternate_color:primary;
  return `--team-primary:${primary};--team-secondary:${secondary}`;
 }
-function formationSlots(lineup){
- const starters=lineup.starters||[],all=[...starters,...(lineup.bench||[])],active=currentPlayers(lineup),placed=new Set();
+function formationSlots(lineup,initialLineup=false){
+ const starters=lineup.starters||[],all=[...starters,...(lineup.bench||[])],active=initialLineup?starters:currentPlayers(lineup),placed=new Set();
  const parts=String(lineup.formation||'').split('-').map(Number);
  if(!parts.length||parts.some(n=>!Number.isInteger(n)||n<1||n>5)||parts.reduce((a,b)=>a+b,0)!==10||starters.length!==11)return {slots:[],unplaced:active};
  const rows=[1,...parts],rank=p=>{const pos=String(p.position||'').toUpperCase();return /^(G|GK)$/.test(pos)?0:/^(D|CD|LB|RB|CB|LWB|RWB)/.test(pos)?1:/DM/.test(pos)?2:/^(M|CM|LM|RM)/.test(pos)?3:/AM/.test(pos)?4:5};
  const ordered=[...starters].sort((a,b)=>rank(a)-rank(b)||Number(a.formation_place||99)-Number(b.formation_place||99));
- let index=0;const slots=[];
+ let index=0;const slots=[],openSlots=[];
  rows.forEach((count,row)=>{for(let col=0;col<count;col++){
    let p=ordered[index++];const visited=new Set();
-   while(p?.subbed_out&&p.replacement_id&&!visited.has(p.id)){visited.add(p.id);p=all.find(q=>String(q.id)===String(p.replacement_id))}
-   if(!p||p.subbed_out||p.red||!active.includes(p)||placed.has(p))continue;
-   placed.add(p);slots.push({player:p,x:100*(col+1)/(count+1),y:10+row*78/(rows.length-1),width:Math.min(23,90/(count+1))});
+   while(!initialLineup&&p?.subbed_out&&p.replacement_id&&!visited.has(p.id)){visited.add(p.id);p=all.find(q=>String(q.id)===String(p.replacement_id))}
+   const point={x:100*(col+1)/(count+1),y:10+row*78/(rows.length-1),width:Math.min(23,90/(count+1))};
+   if(!p||(!initialLineup&&(p.subbed_out||p.red))||!active.includes(p)||placed.has(p)){openSlots.push(point);continue;}
+   placed.add(p);slots.push({...point,player:p});
  }});
+ const unplaced=active.filter(p=>!placed.has(p));
+ unplaced.slice(0,openSlots.length).forEach((player,i)=>{slots.push({...openSlots[i],player});placed.add(player)});
  return {slots,unplaced:active.filter(p=>!placed.has(p))};
 }
 function formationPlayer(s,p,side){
@@ -51,6 +54,22 @@ function formationHTML(s){
  const missing=['home','away'].map((side,i)=>layouts[i].unplaced.length?`<div class="formation-unplaced"><strong>${esc(s[side]?.name)} · sem posição confirmada</strong><div>${layouts[i].unplaced.map(p=>formationPlayer(s,p,side)).join('')}</div></div>`:'').join('');
  return `<div class="formation-board" style="--pitch-home:${background('home')};--pitch-away:${background('away')}">${header('home')}<div class="formation-grass"><div class="formation-circle"></div>${half('home',0)}${half('away',1)}</div>${header('away')}</div>${missing}<p class="formation-caption">Disposição tática aproximada a partir da formação inicial. Substitutos ocupam a vaga informada pela fonte. Não representa movimento ao vivo.<br>Dados: ${esc(s.source||'—')} · Fotos: fonte da escalação, ESPN e TheSportsDB, quando disponíveis.</p>`;
 }
+function formationIntroHTML(s,progress,section='full'){
+ const side=progress.side,lineup=s.lineups?.[side]||{},players=typeof currentPlayers==='function'?currentPlayers(lineup):(lineup.starters||[]);
+ const isCoach=progress.role==='coach',index=Math.min(Math.max(0,Number(progress.index)||0),Math.max(0,players.length-1)),player=isCoach?null:players[index];
+ const layout=formationSlots(lineup),revealed=new Set(players.slice(0,index+1)),visible=isCoach?[]:layout.slots.filter(slot=>revealed.has(slot.player));
+ const team=s[side]||{},coach=matchCoach(s,side),formation=esc(lineup.formation||'Formacao nao informada');
+ const field=visible.map(slot=>{const portrait=s.appearance?.scene==='formation',x=portrait?slot.x:slot.y,y=portrait?(side==='home'?slot.y:100-slot.y):slot.x;return `<div class="lineup-read-slot ${slot.player===player?'lineup-read-entering':''}" style="left:${x}%;top:${y}%;--slot-x:${slot.x}%;--slot-y:${side==='home'?slot.y:100-slot.y}%;--slot-width:${Math.min(18,slot.width)}%">${formationPlayer(s,slot.player,side)}</div>`}).join('');
+ const pitch=side==='home'?(s.appearance?.formation_home_background||'#426e50'):(s.appearance?.formation_away_background||'#426e50');
+ const heading=`<header class="lineup-read-heading"><span>ESCALACAO EM LEITURA</span><strong>${esc(team.name||'Time')} <small>${formation}</small></strong><b>${isCoach?'TECNICO':`${index+1} / ${players.length}`}</b></header>`;
+ const fieldMarkup=`<div class="lineup-read-pitch" style="--lineup-pitch:${pitch}"><span class="lineup-read-box"></span><span class="lineup-read-circle"></span>${layout.slots.length?field:`<p class="lineup-read-no-position">Posicao tatica nao informada pela fonte</p>`}</div>`;
+ let person='';
+ if(isCoach){const photo=formationPhoto(coach?.photo);person=`<div class="lineup-read-feature"><span class="lineup-read-feature-photo coach" style="${formationTeamColors(team,s.appearance,side)}">${photo?`<img src="${esc(photo)}" alt="" onerror="this.hidden=true">`:''}</span><div><small>TECNICO DA EQUIPE</small><strong>${esc(coach?.name||'Tecnico nao informado')}</strong><span>${esc(team.name||'Time')}</span></div></div>`}
+ else if(player){const photo=playerPortrait(s,player,side);person=`<div class="lineup-read-feature"><span class="lineup-read-feature-photo" style="${formationTeamColors(team,s.appearance,side)}">${photo?`<img src="${esc(photo)}" alt="" onerror="this.hidden=true">`:''}</span><div><small>EM CAMPO ? TITULAR ${index+1} DE ${players.length}</small><strong>${esc(player.number||'--')} ${esc(player.name)}</strong><span>${esc(player.position||'Posicao nao informada')}</span></div></div>`}
+ if(section==='field')return `<div class="lineup-read-card ${s.appearance?.scene==='formation'?'lineup-read-portrait':''}" style="--lineup-accent:${side==='home'?'var(--accent)':'var(--away)'}">${heading}${fieldMarkup}</div>`;
+ if(section==='person')return `<div class="lineup-read-panel" style="--lineup-accent:${side==='home'?'var(--accent)':'var(--away)'}">${heading}${person?`<div class="lineup-read-person-area">${person}</div>`:''}</div>`;
+ return `<div class="lineup-read-card ${s.appearance?.scene==='formation'?'lineup-read-portrait':''}" style="--lineup-accent:${side==='home'?'var(--accent)':'var(--away)'}">${heading}${fieldMarkup}${person?`<div class="lineup-read-person">${person}</div>`:''}</div>`;
+}
 function formationDetails(s,side,id){
  const l=s.lineups?.[side]||{},p=[...(l.starters||[]),...(l.bench||[])].find(p=>String(p.id)===id);if(!p)return '';
  const bio=s.player_profiles?.[profileKey(s,p)]||{};
@@ -67,9 +86,7 @@ function benchPlayers(lineup){
  return [...(lineup.bench||[]).filter(p=>!p.subbed_in||p.subbed_out||p.red),...(lineup.starters||[]).filter(p=>p.subbed_out||p.red)].filter(p=>{const key=p.id||p.name;if(seen.has(key))return false;seen.add(key);return true});
 }
 function formationCoachHTML(s,side){
-  const manual=s.coach_overrides?.[side];
-  const candidates=(manual?[manual]:[s.ge?.ready?s.ge.coaches?.[side]:null,s.coaches?.[side],s.catalog_coaches?.[side]]).filter(c=>c?.name);
-  const coach=candidates.find(c=>c.name===candidates[0]?.name&&formationPhoto(c.photo))||candidates[0];
+  const coach=matchCoach(s,side);
   const coachPhoto=formationPhoto(coach?.photo);
   return `<footer class="formation-coach"><span>TÉCNICO</span>${coachPhoto?`<img class="formation-coach-photo" src="${esc(coachPhoto)}" alt="" onerror="this.hidden=true">`:""}<strong>${esc(coach?.name||'Não informado pela fonte')}</strong>${coach?.source?`<small>Fonte: ${esc(coach.source)}</small>`:''}</footer>`;
 }

@@ -227,8 +227,13 @@ class LocalBrain:
 
     async def news_script(self, articles, context):
         """Generate attributed speech segments from RSS headline metadata, in batches."""
-        if not self.ready or not self.base_url or not self.model:
-            raise HTTPException(503, 'Conecte e teste a LLM no painel antes de gerar o roteiro.')
+        if not self.base_url or not self.model:
+            raise HTTPException(503, 'Configure e salve a URL e o modelo da LLM no painel antes de gerar o roteiro.')
+        # `ready` is an in-memory flag: it resets on restart and may be cleared by
+        # an unrelated failed narration request. Revalidate here instead of
+        # rejecting a configured model with a stale flag.
+        if not self.ready:
+            await self.start()
         if not articles:
             raise HTTPException(400, 'Pesquise notícias recentes antes de gerar o roteiro.')
         segments = []

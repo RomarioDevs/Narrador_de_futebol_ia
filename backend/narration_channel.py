@@ -96,6 +96,10 @@ class QueueItem(BaseModel):
     kind: str = Field(max_length=30)
     role: str = Field(max_length=30)
     label: str = Field(default='', max_length=80)
+    lineup_side: Literal['home', 'away'] | None = None
+    lineup_role: Literal['coach', 'player'] | None = None
+    lineup_index: int | None = Field(default=None, ge=0, le=24)
+    lineup_total: int | None = Field(default=None, ge=1, le=25)
 
 
 class LeaseRequest(BaseModel):
