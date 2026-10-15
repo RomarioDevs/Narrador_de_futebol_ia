@@ -28,6 +28,7 @@ from backend.rehearsal import Rehearsal
 from backend.player_profiles import PlayerProfiles
 from backend.player_photos import PlayerPhotos
 from backend.youtube_live import YouTubeLiveChat
+from backend.news_context import NewsContext
 
 load_dotenv()
 BASE = Path(__file__).parent
@@ -158,6 +159,8 @@ coach_overrides = CoachOverrides(BASE, state, broadcast)
 coach_overrides.install(app)
 youtube_chat = YouTubeLiveChat(state, broadcast)
 youtube_chat.install(app)
+news_context = NewsContext(state)
+news_context.install(app)
 
 @app.get("/favicon.ico", include_in_schema=False, status_code=204)
 async def favicon():

@@ -29,6 +29,7 @@ class YouTubeLiveChat:
         self.next_page = ""
         self.seen: set[str] = set()
         self.last_user: dict[str, float] = {}
+        self.mentions: dict[str, dict[str, Any]] = {}
         self.info = {"enabled": False, "connected": False, "messages": 0, "error": None}
         self.state["youtube_chat"] = dict(self.info)
 
@@ -36,7 +37,27 @@ class YouTubeLiveChat:
         return bool(os.getenv("YOUTUBE_API_KEY", "").strip() and os.getenv("YOUTUBE_LIVE_CHAT_ID", "").strip())
 
     def status(self):
-        return {**self.info, "configured": self.configured(), "chat_id": bool(os.getenv("YOUTUBE_LIVE_CHAT_ID", "").strip())}
+        return {**self.info, "configured": self.configured(), "chat_id": bool(os.getenv("YOUTUBE_LIVE_CHAT_ID", "").strip()), "top_players": self.top_players()}
+
+    def _player_names(self):
+        names = []
+        for lineup in (self.state.get("lineups") or {}).values():
+            for player in (lineup or {}).get("starters", []) + (lineup or {}).get("bench", []):
+                name = clean_text(player.get("name", ""), 80)
+                if len(name) >= 3:
+                    names.append(name)
+        return names
+
+    def track_mentions(self, text: str):
+        folded = text.casefold()
+        for name in self._player_names():
+            if name.casefold() not in folded:
+                continue
+            entry = self.mentions.setdefault(name, {"name": name, "count": 0})
+            entry["count"] += 1
+
+    def top_players(self):
+        return sorted(self.mentions.values(), key=lambda item: (-item["count"], item["name"].casefold()))[:3]
 
     def make_event(self, text: str, author: str, kind: str = "event"):
         return {
@@ -65,7 +86,8 @@ class YouTubeLiveChat:
         if command in {"escalação", "escalacao"}:
             return "As escalações e os jogadores em campo estão disponíveis no painel da transmissão."
         if command == "jogador":
-            return f"Pedido recebido sobre {argument or 'o jogador'}. Vou comentar apenas com os dados confirmados desta partida."
+            top = ", ".join(f"{item['name']} ({item['count']} menções)" for item in self.top_players()) or "ainda não há menções suficientes"
+            return f"Os três jogadores mais comentados são: {top}. Pedido recebido sobre {argument or 'o jogador'}; vou usar apenas dados confirmados."
         if command == "pergunta":
             return f"Pergunta recebida: {argument or 'sem texto'}. A resposta será baseada nos dados disponíveis da partida."
         if command == "narrar":
@@ -97,6 +119,7 @@ class YouTubeLiveChat:
                     snippet = item.get("snippet", {})
                     author = clean_text(item.get("authorDetails", {}).get("displayName", "espectador"), 80)
                     text = clean_text(snippet.get("displayMessage", ""))
+                    self.track_mentions(text)
                     response = self.response_for(text, author)
                     self.info["messages"] += 1
                     if response:
@@ -136,6 +159,10 @@ class YouTubeLiveChat:
         @app.get("/api/youtube/status")
         async def status():
             return self.status()
+
+        @app.get("/api/youtube/top-players")
+        async def top_players():
+            return {"players": self.top_players()}
 
         @app.post("/api/youtube/start")
         async def start():

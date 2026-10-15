@@ -44,7 +44,7 @@ class SpeechOutput {
   this.token++;
   this.controller?.abort();this.controller=null;
   if(this.source){this.source.onended=null;this.source.stop();this.source.disconnect();this.source.buffer=null;this.source=null;}
-  this.gain?.disconnect();this.gain=null;
+   this.gain?.disconnect();this.gain=null;this.compressor?.disconnect();this.compressor=null;
   if(this.nativeActive)this.native?.cancel();
   this.nativeActive=false;this.current=null;
  }
@@ -102,15 +102,16 @@ class SpeechOutput {
    const buffer=await this.context.decodeAudioData(await response.arrayBuffer());
    if(token!==this.token)return;
    if(this.canSpeak&&!this.canSpeak())throw new Error('A conexão da saída de áudio foi interrompida.');
-   const source=this.context.createBufferSource(),gain=this.context.createGain();
+   const source=this.context.createBufferSource(),gain=this.context.createGain(),compressor=this.context.createDynamicsCompressor();
    source.buffer=buffer;gain.gain.value=utterance.volume;
-   source.connect(gain);gain.connect(this.context.destination);
+   compressor.threshold.value=-18;compressor.knee.value=18;compressor.ratio.value=5;compressor.attack.value=.004;compressor.release.value=.12;
+   source.connect(gain);gain.connect(compressor);compressor.connect(this.context.destination);
    source.onended=()=>{
-    source.disconnect();gain.disconnect();source.buffer=null;
+    source.disconnect();gain.disconnect();compressor.disconnect();source.buffer=null;
     if(token!==this.token)return;
     this.source=null;this.gain=null;this.current=null;utterance.onend?.();
    };
-   this.source=source;this.gain=gain;source.start();utterance.onstart?.();
+   this.source=source;this.gain=gain;this.compressor=compressor;source.start();utterance.onstart?.();
   }catch(error){
    if(token===this.token){this.current=null;utterance.onerror?.({error:error.speechCode||'synthesis-failed',message:error.name==='AbortError'?'A geração da voz demorou demais. Teste novamente.':error.message});}
   }finally{

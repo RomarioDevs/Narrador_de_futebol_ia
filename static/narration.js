@@ -256,8 +256,8 @@ class MatchNarrator {
   const utterance=new this.Utterance(this.pronounce(item.text));
   const commentary=item.kind==='analysis'&&(!this.previewing||this.previewRole==='commentary');
   const voice=commentary?this.commentaryVoice||this.voice:this.voice;
-  const pace=this.delivery==='dynamic'?({goal:1.08,card:1.02,analysis:.95}[item.kind]||1):1;
-  Object.assign(utterance,{voice,lang:voice.lang,rate:Math.min(1.4,Math.max(.7,(commentary?this.commentaryRate:this.rate)*pace)),volume:commentary?this.commentaryVolume:this.volume,pitch:1,delivery:this.delivery||'natural',kind:item.kind});
+  const profile=this.delivery==='dynamic'?({goal:{pace:1.1,pitch:1.06,volume:1},card:{pace:.96,pitch:.98,volume:.92},review:{pace:.9,pitch:1.02,volume:.94},substitution:{pace:1,pitch:1,volume:.95},analysis:{pace:.95,pitch:1,volume:.9}}[item.kind]||{pace:1,pitch:1,volume:1}):{pace:1,pitch:1,volume:1};
+  Object.assign(utterance,{voice,lang:voice.lang,rate:Math.min(1.4,Math.max(.7,(commentary?this.commentaryRate:this.rate)*profile.pace)),volume:Math.min(1, (commentary?this.commentaryVolume:this.volume)*profile.volume),pitch:profile.pitch,delivery:this.delivery||'natural',kind:item.kind});
   this.lastSource=item.source||null;
   this.utterance=utterance;this.utteranceKind=item.kind;this.lastText=item.text;this.notify(this.previewing?'Testando a voz…':item.kind==='analysis'?'Panorama da partida…':'Narrando…');
   utterance.onwaiting=status=>{if(this.utterance===utterance)this.notify(status);};
