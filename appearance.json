@@ -12,8 +12,9 @@
   "away_photo_secondary": "#0951a1",
   "formation_home_background": "#426e50",
   "formation_away_background": "#426e50",
-  "panel_opacity": 0.94,
-  "image_dim": 0.49,
+  "formation_player_scale": 1.0,
+  "panel_opacity": 1.0,
+  "image_dim": 0.61,
   "layout": "center",
   "show_stats": true,
   "show_events": true,
@@ -23,6 +24,7 @@
   "show_logos": true,
   "home_logo": "",
   "away_logo": "",
-  "channel_name": "FUTEBOL LIVE",
-  "scene": "match"
+  "channel_logo": "/static/uploads/9c220bdefcf0db02ec4ce2f5b3f26b64dbacd1c53bd40a56432c5058de60a33c.png",
+  "channel_name": "Pós jogo BR",
+  "scene": "table"
 }

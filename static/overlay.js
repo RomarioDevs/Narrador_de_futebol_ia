@@ -3,7 +3,13 @@ addEventListener('resize',resize);resize();
 function logo(side,url,name){const img=$(side+'Logo'),fallback=$(side+'Fallback');fallback.textContent=name;img.alt='Escudo '+name;if(img.dataset.url===url)return;img.dataset.url=url||'';img.hidden=true;fallback.hidden=false;if(url){img.onload=()=>{img.hidden=false;fallback.hidden=true};img.onerror=()=>{img.hidden=true;fallback.hidden=false};img.src=url}else img.removeAttribute('src')}
 function appearance(a={}){
  const root=document.documentElement;root.style.setProperty('--accent',a.accent||'#ffffff');root.style.setProperty('--away',a.away_accent||'#72aaff');root.style.setProperty('--panel',`rgba(12,20,30,${a.panel_opacity??.94})`);
- $('channelName').textContent=a.channel_name||'';$('stage').classList.toggle('compact',a.layout==='compact');$('stage').classList.toggle('no-logos',a.show_logos===false);
+ root.style.setProperty('--formation-player-scale',String(a.formation_player_scale??1));
+ $('channelName').textContent=a.channel_name||'';
+ const channelLogo=$('channelLogo'),brandMark=$('brandMark'),logoUrl=a.channel_logo||'';
+ brandMark.hidden=!!logoUrl;channelLogo.alt='Logo do canal '+(a.channel_name||'');
+ if(channelLogo.dataset.url!==logoUrl){channelLogo.dataset.url=logoUrl;channelLogo.hidden=true;if(logoUrl){channelLogo.onload=()=>{channelLogo.hidden=false};channelLogo.onerror=()=>{channelLogo.hidden=true;brandMark.hidden=false};channelLogo.src=logoUrl}else channelLogo.removeAttribute('src')}
+ if(!logoUrl)channelLogo.hidden=true;
+ $('stage').classList.toggle('compact',a.layout==='compact');$('stage').classList.toggle('no-logos',a.show_logos===false);
  $('statsPanel').hidden=a.show_stats===false;$('eventsPanel').hidden=a.show_events===false;$('matchLineups').hidden=a.show_lineups===false;$('pitchPanel').hidden=!a.show_pitch;$('contextBand').hidden=a.show_context===false||a.scene!=='match';$('stage').classList.toggle('with-pitch',!!a.show_pitch);
  $('matchPanels').hidden=['lineups','bench','table','formation'].includes(a.scene);$('lineupsPanel').hidden=!['lineups','bench'].includes(a.scene);$('lineupGroup').textContent=a.scene==='bench'?'Reservas':'Em campo';$('tablePanel').hidden=a.scene!=='table';
  const bg=$('backdrop');bg.style.backgroundImage='none';bg.style.backgroundColor='transparent';$('shade').style.background='transparent';
@@ -40,7 +46,7 @@ function render(s){
  const action=s.field_action,manual=s.source==='manual';$('ball').hidden=!action&&!manual;$('ball').style.left=(action?.x??s.ball.x)+'%';$('ball').style.top=(action?.y??s.ball.y)+'%';$('pitchEyebrow').textContent=manual?'CONTROLE MANUAL':'ÚLTIMA POSIÇÃO INFORMADA';$('zone').textContent=action?`${action.team} · ${action.minute} · Posição de lance registrado; não é a bola ao vivo.`:manual?s.ball.label:'A fonte não informa quem ataca ou a posição da bola ao vivo.';
  $('stats').innerHTML=Object.entries(statNames).map(([k,n])=>{const v=s.stats[k]||[null,null],x=Number(v[0]||0),y=Number(v[1]||0),sum=Math.max(1,x+y);const show=n=>n==null?'—':Number(n).toLocaleString('pt-BR')+(['possession','pass_accuracy'].includes(k)?'%':'');return `<div class="stat"><span class="stat-value">${show(v[0])}</span><div><div class="stat-name">${n}</div><div class="bar"><i style="width:${x/sum*100}%"></i><i style="width:${y/sum*100}%"></i></div></div><span class="stat-value">${show(v[1])}</span></div>`}).join('');
  const events=s.ge?.ready?s.ge.events||[]:s.events||[];
- $('events').innerHTML=events.length?events.slice(0,a.show_pitch?2:5).map(e=>{const kind=typeof MatchEvents!=='undefined'?MatchEvents.kind(e):(e.kind||'event');return `<div class="event event-${esc(kind)}"><span class="event-minute">${esc(e.minute)}${e.minute==='—'?'':'′'}</span><div><div class="event-text">${esc(e.icon)} ${esc(e.text)}</div>${e.editorial?'<small>Fonte: ge · tempo real</small>':''}${e.text_en?`<div class="event-english" lang="en">${esc(e.text_en)}</div>`:''}</div></div>`}).join(''):'<p class="empty">Aguardando eventos da partida.</p>';
+ $('events').innerHTML=events.length?events.slice(0,a.show_pitch?2:5).map(e=>{const kind=typeof MatchEvents!=='undefined'?MatchEvents.kind(e):(e.kind||'event');return `<div class="event event-${esc(kind)}"><span class="event-minute">${esc(e.minute)}${e.minute==='—'?'':'′'}</span><div><div class="event-text">${esc(e.icon)} ${esc(e.text)}</div>${e.text_en?`<div class="event-english" lang="en">${esc(e.text_en)}</div>`:''}</div></div>`}).join(''):'<p class="empty">Aguardando eventos da partida.</p>';
  $('overlayLineups').innerHTML=lineupHTML(s,a.scene==='bench'?'bench':'field');
  $('matchLineupRows').innerHTML=formationHTML(s);
  if(typeof matchAnimation!=='undefined')matchAnimation.update(s);

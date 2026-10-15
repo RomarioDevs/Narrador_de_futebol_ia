@@ -21,6 +21,19 @@ def player_key(state, player):
     return '|'.join(str(v or '') for v in (state.get('source'), player.get('id'), player.get('name')))
 
 
+def photo_key(state, player):
+    """Stable manual-photo identity across data providers and provider-specific player IDs."""
+    name = normalized_name(str(player.get('name') or ''))
+    for side in ('home', 'away'):
+        lineup = state.get('lineups', {}).get(side, {})
+        players = [*lineup.get('starters', []), *lineup.get('bench', [])]
+        if any(candidate is player or (candidate.get('name') == player.get('name') and
+                                       str(candidate.get('id') or '') == str(player.get('id') or ''))
+               for candidate in players):
+            return normalized_name(str(state.get(side, {}).get('name') or '')) + '|' + name
+    return '|' + name
+
+
 def safe_photo(value):
     try:
         parsed = urlsplit(value or '')

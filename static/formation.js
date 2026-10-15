@@ -1,6 +1,17 @@
 function profileKey(s,p){return [s.source,p.id,p.name].map(v=>v??'').join('|')}
+function photoIdentity(value){return String(value||'').normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toLowerCase().match(/[a-z0-9]+/g)?.filter(word=>!['fc','cf','sc','afc','ac'].includes(word)).join(' ')||''}
+function playerPhotoKey(s,p,side=''){
+ if(!side)side=['home','away'].find(team=>([...(s.lineups?.[team]?.starters||[]),...(s.lineups?.[team]?.bench||[])].some(item=>item===p||(String(item.id)===String(p.id)&&item.name===p.name))))||'';
+ return `${photoIdentity(s[side]?.name)}|${photoIdentity(p.name)}`;
+}
+function playerPhotoOverride(s,p,side=''){
+ const overrides=s.player_photo_overrides||{},stable=overrides[playerPhotoKey(s,p,side)];if(stable)return stable;
+ const legacy=overrides[profileKey(s,p)];if(legacy)return legacy;
+ const matches=Object.entries(overrides).filter(([key])=>photoIdentity(key.split('|').at(-1))===photoIdentity(p.name));
+ return matches.length===1?matches[0][1]:'';
+}
 function formationPhoto(url){if(/^\/static\/uploads\/[a-f0-9]{64}\.(png|jpg|webp)$/.test(url||''))return url;try{const u=new URL(url);return u.protocol==='https:'&&!u.username&&!u.password?u.href:''}catch{return ''}}
-function playerPortrait(s,p){return formationPhoto(s.player_photo_overrides?.[profileKey(s,p)])||formationPhoto(p.photo)||formationPhoto(s.player_profiles?.[profileKey(s,p)]?.photo)}
+function playerPortrait(s,p,side=''){return formationPhoto(playerPhotoOverride(s,p,side))||formationPhoto(p.photo)||formationPhoto(s.player_profiles?.[profileKey(s,p)]?.photo)}
 function formationTeamColors(team={},appearance={},side='home'){
  const valid=value=>/^#[0-9a-f]{6}$/i.test(value||'');
  if(appearance[side+'_custom_colors'])team={color:appearance[side+'_photo_color'],alternate_color:appearance[side+'_photo_secondary']};
@@ -24,7 +35,7 @@ function formationSlots(lineup){
  return {slots,unplaced:active.filter(p=>!placed.has(p))};
 }
 function formationPlayer(s,p,side){
- const photo=playerPortrait(s,p);
+ const photo=playerPortrait(s,p,side);
  const count=value=>Number.isFinite(Number(value))?Math.max(0,Math.min(99,Math.floor(Number(value)))):0;
  const goals=count(p.match_stats?.totalGoals),assists=count(p.match_stats?.goalAssists);
  const markers=goals?`<span class="formation-goals" title="${goals} gol(s)" aria-label="${goals} gol(s)">${'⚽'.repeat(goals)}</span> `:'';

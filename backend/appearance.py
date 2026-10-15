@@ -22,6 +22,7 @@ class Appearance(BaseModel):
     away_photo_secondary: str = Field(default="#ffffff", pattern=r"^#[0-9a-fA-F]{6}$")
     formation_home_background: str = Field(default="#426e50", pattern=r"^#[0-9a-fA-F]{6}$")
     formation_away_background: str = Field(default="#426e50", pattern=r"^#[0-9a-fA-F]{6}$")
+    formation_player_scale: float = Field(default=1, ge=0.8, le=1.7)
     panel_opacity: float = Field(default=0.94, ge=0.3, le=1)
     image_dim: float = Field(default=0.35, ge=0, le=0.9)
     layout: Literal["center", "compact"] = "center"
@@ -33,10 +34,11 @@ class Appearance(BaseModel):
     show_logos: bool = True
     home_logo: str = ""
     away_logo: str = ""
+    channel_logo: str = ""
     channel_name: str = Field(default="FUTEBOL LIVE", max_length=50)
     scene: Literal["match", "lineups", "bench", "table", "formation"] = "match"
 
-    @field_validator("background_image", "home_logo", "away_logo")
+    @field_validator("background_image", "home_logo", "away_logo", "channel_logo")
     @classmethod
     def local_image(cls, value):
         if value and (not value.startswith("/static/uploads/") or ".." in value or "\\" in value):

@@ -6,7 +6,8 @@ from pathlib import Path
 from fastapi import HTTPException
 from pydantic import BaseModel, Field
 
-from backend.player_profiles import player_key
+from backend.comparison import normalized_name
+from backend.player_profiles import photo_key, player_key
 
 
 class PhotoSelection(BaseModel):
@@ -34,11 +35,21 @@ class PlayerPhotos:
         async def select(payload: PhotoSelection):
             players = [p for lineup in self.state.get('lineups', {}).values()
                        for p in [*lineup.get('starters', []), *lineup.get('bench', [])]]
-            if not any(player_key(self.state, p) == payload.key for p in players):
-                raise HTTPException(409, 'A partida mudou ou o jogador não está mais na lista. Selecione novamente.')
+            player = next((p for p in players if photo_key(self.state, p) == payload.key), None)
+            if player is None:
+                raise HTTPException(409, 'A partida mudou ou o jogador saiu da lista. Selecione novamente.')
             if payload.url and not self.valid_url(payload.url):
                 raise HTTPException(400, 'Envie uma foto PNG, JPG ou WebP pelo painel primeiro.')
             updated = self.photos.copy()
+            legacy = [key for key in updated if key == player_key(self.state, player) or
+                      key.endswith('|' + str(player.get('id') or '') + '|' + str(player.get('name') or ''))]
+            if not legacy:
+                same_name = [key for key in updated
+                             if normalized_name(key.rsplit('|', 1)[-1]) == normalized_name(str(player.get('name') or ''))]
+                if len(same_name) == 1:
+                    legacy = same_name
+            for key in legacy:
+                updated.pop(key, None)
             if payload.url:
                 updated[payload.key] = payload.url
             else:

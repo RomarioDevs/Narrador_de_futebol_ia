@@ -4,7 +4,7 @@ function updatePlayerPhotoPreview(){
  $('playerPhotoUpload').disabled=!selected;
  $('resetPlayerPhoto').disabled=!selected;
  if(!selected){image.hidden=true;$('playerPhotoStatus').textContent='Carregue uma partida e selecione um jogador.';return}
- const {player}=selected,url=playerPortrait(S,player),custom=S.player_photo_overrides?.[profileKey(S,player)];
+ const {player,side}=selected,url=playerPortrait(S,player,side),custom=playerPhotoOverride(S,player,side);
  image.hidden=!url;image.onerror=()=>{image.hidden=true};image.alt='Foto de '+player.name;
  if(url&&image.getAttribute('src')!==url)image.src=url;
  $('playerPhotoStatus').textContent=custom?'Foto enviada por você.':url?'Foto automática disponível.':'Sem foto disponível. Você pode enviar uma imagem.';
@@ -15,8 +15,8 @@ function renderPlayerPhotoControls(s){
  const rows=[];photoChoices=new Map();
  for(const side of ['home','away']){const l=s.lineups?.[side]||{};
   for(const player of [...(l.starters||[]),...(l.bench||[])]){
-   const key=profileKey(s,player);if(photoChoices.has(key))continue;
-   photoChoices.set(key,{player,side});rows.push([key,`${s[side].name} · ${player.number||'—'} ${player.name}${playerPortrait(s,player)?'':' · sem foto'}`]);
+   const key=playerPhotoKey(s,player,side);if(photoChoices.has(key))continue;
+   photoChoices.set(key,{player,side});rows.push([key,`${s[side].name} · ${player.number||'—'} ${player.name}${playerPortrait(s,player,side)?'':' · sem foto'}`]);
   }
  }
  const signature=JSON.stringify(rows),select=$('playerPhotoSelect');
@@ -24,7 +24,7 @@ function renderPlayerPhotoControls(s){
  $('rosterProfileStatus').textContent=s.profile_status||'';
  // Rendering receives the newest state before the control's shared S is assigned.
  const choice=photoChoices.get(select.value);if(choice){
-  const image=$('playerPhotoPreview'),url=playerPortrait(s,choice.player),custom=s.player_photo_overrides?.[select.value];
+  const image=$('playerPhotoPreview'),url=playerPortrait(s,choice.player,choice.side),custom=playerPhotoOverride(s,choice.player,choice.side);
   image.hidden=!url;image.onerror=()=>image.hidden=true;image.alt='Foto de '+choice.player.name;if(url&&image.getAttribute('src')!==url)image.src=url;
   $('playerPhotoStatus').textContent=custom?'Foto enviada por você.':url?'Foto automática disponível.':'Sem foto disponível. Você pode enviar uma imagem.';
   $('playerPhotoUpload').disabled=false;$('resetPlayerPhoto').disabled=!custom;

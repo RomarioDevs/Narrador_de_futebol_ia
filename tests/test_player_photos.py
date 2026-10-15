@@ -18,15 +18,19 @@ class PlayerPhotoTests(unittest.TestCase):
             name = 'a' * 64 + '.png'
             (uploads / name).write_bytes(b'fixture')
             url = '/static/uploads/' + name
-            state = {'source': 'ESPN', 'lineups': {'home': {'starters': [{'id': '1', 'name': 'Player'}]}}}
+            state = {'source': 'ESPN', 'home': {'name': 'Home Team'}, 'away': {'name': 'Away Team'},
+                     'lineups': {'home': {'starters': [{'id': '1', 'name': 'Player'}]}}}
             service = PlayerPhotos(base, state, AsyncMock())
             app = FastAPI()
             service.install(app)
             with TestClient(app) as client:
-                key = 'ESPN|1|Player'
+                key = 'home team|player'
                 self.assertEqual(client.post('/api/players/photo', json={'key': key, 'url': url}).status_code, 200)
                 self.assertEqual(PlayerPhotos(base, {}, AsyncMock()).photos[key], url)
-                self.assertEqual(client.post('/api/players/photo', json={'key': 'ESPN|2|Other', 'url': url}).status_code, 409)
+                state['source'] = 'GE'
+                state['lineups']['home']['starters'] = [{'id': '99', 'name': 'Player'}]
+                self.assertEqual(client.post('/api/players/photo', json={'key': key, 'url': url}).status_code, 200)
+                self.assertEqual(client.post('/api/players/photo', json={'key': 'home team|other', 'url': url}).status_code, 409)
                 for bad in ('/static/uploads/../../secret.png', 'https://example.com/photo.png', '/static/uploads/' + 'b'*64 + '.png'):
                     self.assertEqual(client.post('/api/players/photo', json={'key': key, 'url': bad}).status_code, 400)
                 self.assertEqual(client.post('/api/players/photo', json={'key': key, 'url': ''}).status_code, 200)
