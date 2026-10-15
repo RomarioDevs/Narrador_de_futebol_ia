@@ -1,6 +1,6 @@
 """Free RSS headline discovery for match context; headlines are never live events."""
 import asyncio
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
 import hashlib
 import json
@@ -144,12 +144,35 @@ class NewsContext:
     def _domains(self):
         return sorted({domain for publisher in self.settings['publishers'] for domain in PUBLISHERS[publisher][1]})
 
-    def _search_query(self, days):
-        terms = list(dict.fromkeys([*self._teams(), *self._player_names()]))
+    def _season_year(self):
+        kickoff = str(self.state.get('kickoff') or '')
+        try:
+            return datetime.fromisoformat(kickoff.replace('Z', '+00:00')).year
+        except ValueError:
+            return datetime.now(timezone.utc).year
+
+    def _competition_names(self, year):
+        names = [self.clean(self.state.get('competition'), 100)]
+        for group in (self.state.get('league_table') or {}).get('groups', []):
+            competition = self.clean(group.get('name'), 100) if isinstance(group, dict) else ''
+            if competition and competition not in names:
+                names.append(competition)
+        for side in ('home', 'away'):
+            for row in (self.state.get('recent_form', {}).get(side) or [])[:5]:
+                competition = self.clean(row.get('competition'), 100)
+                date = str(row.get('date') or '')
+                if competition and date.startswith(str(year)) and competition not in names:
+                    names.append(competition)
+        return [name for name in names if name]
+
+    def _search_query(self, days=3):
+        year = self._season_year()
+        terms = list(dict.fromkeys([*self._teams(), *self._player_names(), *self._competition_names(year), str(year)]))
+        terms = [term.replace('"', '') for term in terms if term]
         quoted = ' OR '.join(f'"{term}"' for term in terms)
         sites = ' OR '.join(f'site:{domain}' for domain in self._domains())
-        period = 'when:3d' if days == 3 else 'when:7d'
-        return f'({quoted}) ({sites}) {period}'
+        start_of_year = f'{year}-01-01'
+        return f'({quoted}) ({sites}) after:{start_of_year} when:3d'
 
     @staticmethod
     def _facts(articles):
@@ -170,7 +193,8 @@ class NewsContext:
 
     async def fetch(self, days=3, automatic=False):
         async with self._fetch_lock:
-            days = 7 if int(days) >= 7 else 3
+            # Keep the requested coverage strictly bounded to the previous 72 hours.
+            days = 3
             match_key = self._current_match_key()
             if not match_key:
                 raise HTTPException(400, 'Carregue uma partida antes de buscar notícias.')
@@ -186,6 +210,8 @@ class NewsContext:
                 raise HTTPException(502, self.state['news_context']['error']) from exc
 
             domains, articles, seen = self._domains(), [], set()
+            fresh_after = datetime.now(timezone.utc) - timedelta(days=3)
+            fresh_before = datetime.now(timezone.utc) + timedelta(minutes=5)
             for item in root.findall('./channel/item'):
                 title = self.clean(item.findtext('title'), 220)
                 url = self.clean(item.findtext('link'), 800)
@@ -193,7 +219,11 @@ class NewsContext:
                 source = self.clean(source_node.text if source_node is not None else '', 100)
                 source_url = self.clean(source_node.get('url') if source_node is not None else '', 800)
                 host = (urlparse(source_url).hostname or '').removeprefix('www.').casefold()
-                if not title or not source or not url.startswith('https://'):
+                published_at = self._rss_date(item.findtext('pubDate'))
+                if not title or not source or not url.startswith('https://') or not published_at:
+                    continue
+                published = datetime.fromisoformat(published_at)
+                if published < fresh_after or published > fresh_before:
                     continue
                 if not source_url or not any(host == domain or host.endswith('.' + domain) for domain in domains):
                     continue
@@ -203,7 +233,7 @@ class NewsContext:
                 seen.add(normalized)
                 articles.append({'title': title, 'url': url, 'source': source, 'publisher_url': source_url,
                                  'trust': self.trust_label(source_url),
-                                 'published_at': self._rss_date(item.findtext('pubDate')),
+                                 'published_at': published_at,
                                  'description': ''})
             if match_key != self._current_match_key():
                 return self.status()
@@ -213,7 +243,9 @@ class NewsContext:
                                           'updated_at': datetime.now(timezone.utc).isoformat(), 'match_key': match_key,
                                           'articles': articles[:12], 'facts': facts, 'error': None,
                                           'automatic': automatic, 'source_domains': domains,
-                                          'player_terms': self._player_names()}
+                                          'player_terms': self._player_names(),
+                                          'competition_terms': self._competition_names(self._season_year()),
+                                          'season_year': self._season_year(), 'max_age_days': 3}
             if self.broadcast:
                 await self.broadcast()
             return self.status()
@@ -231,8 +263,8 @@ class NewsContext:
 
     def install(self, app):
         @app.get('/api/context/news')
-        async def news(days: int = 3):
-            return await self.fetch(days)
+        async def news():
+            return await self.fetch(days=3)
 
         @app.get('/api/context/status')
         async def status():

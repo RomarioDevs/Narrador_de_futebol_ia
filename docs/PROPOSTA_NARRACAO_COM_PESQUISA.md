@@ -20,7 +20,7 @@ Preparar comentários em português que combinem os dados ao vivo da partida com
 - O planejador recebe fatos do comentário estatístico atual, placar/tempo como contexto e pode escolher até três fatos complementares. O servidor mantém o texto factual validado; a IA não escreve nomes, placares ou lances novos.
 - A narração periódica agora trata corretamente a escolha do comentarista como um objeto de fato, fonte e texto. Isso corrige a seleção de estatísticas/contexto que podia ser marcada como lida sem chegar à fila.
 - O panorama pré-jogo e o roteiro de etapa incluem a forma recente que a fonte já fornece, com resultados e adversários disponíveis.
-- A aba **07 · Notícias** usa a busca RSS gratuita do Google Notícias, sem chave ou assinatura. Consulta nomes dos dois times e até dez jogadores das escalações, filtrando os domínios selecionados. Há busca manual de três ou sete dias e atualização opcional a cada 30 minutos.
+- A aba **07 · Notícias** usa a busca RSS gratuita do Google Notícias, sem chave ou assinatura. Consulta os nomes dos dois times, a competição/temporada e até dez jogadores das escalações, filtrando os domínios selecionados. Só aceita itens com data de publicação dos últimos três dias; a busca automática roda a cada 30 minutos.
 - As preferências ficam em `news_context.json` (ignorado pelo Git). Títulos chegam à fila de voz somente com a opção correspondente ativada; ela começa desligada. O painel exibe títulos, link, veículo e data.
 - O cliente de IA tenta novamente sem `response_format` se o servidor compatível rejeitar JSON mode e passa a mostrar a resposta HTTP de erro do servidor local para ajudar a diagnosticar o 502.
 
@@ -34,7 +34,7 @@ Preparar comentários em português que combinem os dados ao vivo da partida com
 ## Como ativar no programa
 
 1. Reinicie o servidor com `start.bat` e atualize o painel com **Ctrl+F5**.
-2. Na aba **07 · Notícias**, marque as fontes e salve. Não precisa de chave nem cadastro. Pesquise pelos botões de três dias ou uma semana.
+2. Na aba **07 · Notícias**, marque as fontes e salve. Não precisa de chave nem cadastro. Clique em **Pesquisar notícias recentes (até 3 dias)**.
 3. Para atualizar enquanto o jogo está carregado, marque a opção de atualização automática. Ela consulta no máximo a cada 30 minutos.
 4. Mantenha **Incluir títulos na voz** desligado até confirmar que seu plano e as permissões dos veículos cobrem essa retransmissão. O contexto da partida e os comentários estatísticos continuam funcionando sem isso.
 5. Na seção da IA, use **Buscar modelos disponíveis**, escolha o modelo servido pelo LM Studio e teste a conexão. Uma falha deixa a narração factual ativa.
