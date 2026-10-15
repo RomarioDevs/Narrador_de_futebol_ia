@@ -26,7 +26,7 @@ class MatchNarrator {
   this.radio=new RadioCommentary();
   this.compose=compose;this.composing=null;this.finishAfterDrain=false;
   this.lineupQueue=[];this.lineupsSeen=new Set();
-  this.analysisCycle=0;
+  this.analysisCycle=0;this.queuedNewsScriptIds=new Set();
  }
  configure({voice,commentaryVoice=null,rate=1,volume=1,commentaryRate=null,commentaryVolume=null,pronunciations={},stageScripts=true,style='events',commentaryInterval=90,delivery='natural',curiosities=false,announceLineups=false,engagement=false,engagementInterval=600,customComments=[],sponsorReads=[],commentLibrary=[],playerFocus=''}) {
   this.voice=voice;
@@ -55,7 +55,7 @@ class MatchNarrator {
  }
  clearPlayback() {
   clearTimeout(this.scoreTimer);this.scoreTimer=null;this.queue=[];
-  this.lineupQueue=[];
+  this.lineupQueue=[];this.queuedNewsScriptIds.clear();
   this.cancelComposition();this.finishAfterDrain=false;
   const speaking=this.utterance;this.utterance=null;
   if(speaking)this.synth.cancel();
@@ -99,6 +99,21 @@ class MatchNarrator {
   const suffix=mode==='detail'?` ${score}`:mode==='tactical'?` ${score} A informação é baseada no lance registrado, sem inferir movimentos não informados.`:'';
   this.interruptAnalysis();this.enqueue(prefix+base+suffix,'event',{replay:true,urgent:true});
  }
+ queueNewsScript(result,s=this.currentState){
+  if(!this.enabled||this.paused)throw new Error('Inicie a narra??o e deixe a voz ativa antes de enviar o roteiro.');
+  if(!s)throw new Error('Aguarde os dados da partida.');
+  const expected=[s.competition,s.home?.name,s.away?.name].join('|');
+  if(result?.match_key!==expected)throw new Error('O roteiro pertence a outra partida. Pesquise as not?cias novamente.');
+  if(!result.script_id||this.queuedNewsScriptIds.has(result.script_id))throw new Error('Este roteiro j? foi enviado para a fila.');
+  if(!Array.isArray(result.segments)||!result.segments.length)throw new Error('A LLM n?o encontrou not?cias adequadas para narrar.');
+  const now=Date.now(),items=[];
+  const splitText=text=>{let rest=String(text||'').trim(),parts=[];while(rest.length>850){let at=rest.lastIndexOf(' ',850);if(at<350)at=850;parts.push(rest.slice(0,at).trim());rest=rest.slice(at).trimStart();}if(rest)parts.push(rest);return parts;};
+  for(const segment of result.segments){
+   for(const text of splitText(segment?.text))items.push({text,kind:'analysis',script:true,newsScript:true,newsScriptId:result.script_id,source:segment.source,created:now+items.length/1000});
+  }
+  if(!items.length)throw new Error('O roteiro recebido n?o cont?m falas v?lidas.');
+  this.queuedNewsScriptIds.add(result.script_id);this.queue.push(...items);this.sortQueue();this.pump();this.notify('Roteiro de not?cias enviado ? fila de narra??o.');return items.length;
+ }
  readStage(s=this.currentState){
   if(this.paused)throw new Error('Retome a voz para ler o roteiro.');
   if(!this.enabled&&s?.phase==='post'){this.requireVoice();this.enabled=true;this.finishAfterDrain=true;}
@@ -115,12 +130,14 @@ class MatchNarrator {
   const pattern=new RegExp('(?<![\\p{L}\\p{N}])(?:'+entries.map(([key])=>escape(key)).join('|')+')(?![\\p{L}\\p{N}])','giu');
   return text.replace(pattern,match=>lookup.get(match.toLocaleLowerCase('pt-BR'))||match);
  }
- interruptAnalysis({preserveLineups=false}={}){
-  this.queue=this.queue.filter(item=>item.kind!=='analysis'||(preserveLineups&&item.lineup));
-  if(this.composing?.item.kind==='analysis')this.cancelComposition();
-  if(this.utterance&&this.utteranceKind==='analysis'&&!(preserveLineups&&this.currentItem?.lineup)){
+ interruptAnalysis({preserveLineups=false,preserveNewsScript=false}={}){
+  this.queue=this.queue.filter(item=>item.kind!=='analysis'||(preserveLineups&&item.lineup)||(preserveNewsScript&&item.newsScript));
+  if(this.composing?.item.kind==='analysis'&&!(preserveNewsScript&&this.composing.item.newsScript))this.cancelComposition();
+  if(this.utterance&&this.utteranceKind==='analysis'&&!(preserveLineups&&this.currentItem?.lineup)&&!(preserveNewsScript&&this.currentItem?.newsScript)){
    if(this.currentItem?.lineup&&(this.currentItem.manualLineup||this.announceLineups))this.lineupQueue.unshift({...this.currentItem,created:Date.now()});
    this.utterance=null;this.synth.cancel();
+  }else if(this.utterance&&preserveNewsScript&&this.currentItem?.newsScript){
+   this.queue.unshift({...this.currentItem,created:Date.now()});this.utterance=null;this.synth.cancel();
   }
  }
  allowGEJump() {
@@ -234,7 +251,7 @@ class MatchNarrator {
   this.sortQueue();
   // Preserve real-time GE events even when commentary backlog exists; only trim non-live narration chatter.
   while(this.queue.length>12){
-   const drop=this.queue.findIndex(next=>!(next.eventKey||next.editorial||next.urgent||next.scoreAnnouncement||['goal','card','substitution','review','cancelled','correction'].includes(next.kind)));
+   const drop=this.queue.findIndex(next=>!(next.eventKey||next.editorial||next.newsScript||next.urgent||next.scoreAnnouncement||['goal','card','substitution','review','cancelled','correction'].includes(next.kind)));
    if(drop<0)break;
    this.queue.splice(drop,1);
   }
@@ -242,7 +259,7 @@ class MatchNarrator {
  }
  pump() {
   if(this.utterance||this.composing||this.paused||(!this.enabled&&!this.previewing))return;
-  this.queue=this.queue.filter(item=>item.eventKey||Date.now()-item.created<45000);
+  this.queue=this.queue.filter(item=>item.eventKey||item.newsScript||Date.now()-item.created<45000);
   this.sortQueue();
   const item=this.queue.shift()||(!this.scoreTimer?this.lineupQueue.shift():null);
   if(!item){if(this.finishAfterDrain){this.stop('Partida encerrada. Fila e áudios liberados.');return;}this.previewing=false;this.notify(this.enabled?'Aguardando novos lances.':'Teste de voz concluído.');return;}
@@ -518,7 +535,7 @@ class MatchNarrator {
    if(this.composing&&(this.composing.item.kind==='goal'||this.composing.item.scoreAnnouncement))this.cancelComposition();
    this.lastEvent=null;clearTimeout(this.scoreTimer);this.scoreTimer=null;
   }
-  if(fresh.some(e=>this.eventSpeech(e))||scoreChanged||ended){this.interruptAnalysis();this.lastCommentAt=Date.now();}
+  if(fresh.some(e=>this.eventSpeech(e))||scoreChanged||ended){this.interruptAnalysis({preserveNewsScript:true});this.lastCommentAt=Date.now();}
   for(const event of fresh) {
    if(ended&&/^Fim do (?:tempo|segundo)/i.test(event.text||''))continue;
    const key=this.eventKey(event);

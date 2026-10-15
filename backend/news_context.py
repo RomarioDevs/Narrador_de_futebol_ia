@@ -38,9 +38,10 @@ class NewsContext:
     TRUSTED_DOMAINS = KNOWN_DOMAINS
     AUTO_REFRESH_SECONDS = 1800
 
-    def __init__(self, state, broadcast=None, base=None):
+    def __init__(self, state, broadcast=None, base=None, brain=None):
         self.state = state
         self.broadcast = broadcast
+        self.brain = brain
         self.base = Path(base or Path.cwd())
         self.settings_path = self.base / 'news_context.json'
         self.settings = {'auto_refresh': False, 'include_in_voice': False,
@@ -183,7 +184,7 @@ class NewsContext:
         return [{'id': 'news:' + hashlib.sha256(item['url'].encode('utf-8')).hexdigest()[:16],
                  'text': f"Manchete publicada: {item['title']} — fonte {item['source']}, em {item['published_at'] or 'data não informada'}.",
                  'source': {'name': item['source'], 'url': item['url']}}
-                for item in articles[:12]]
+                for item in articles]
 
     @staticmethod
     def _rss_date(value):
@@ -258,7 +259,7 @@ class NewsContext:
             self._match_key = match_key
             self.state['news_context'] = {'configured': True, 'provider': 'rss', **self.settings, 'days': days,
                                           'updated_at': datetime.now(timezone.utc).isoformat(), 'match_key': match_key,
-                                          'articles': articles[:12], 'facts': facts, 'error': None,
+                                          'articles': articles[:40], 'facts': facts, 'error': None,
                                           'automatic': automatic, 'source_domains': domains,
                                           'player_terms': self._player_names(),
                                           'competition_terms': self._competition_names(self._season_year()),
@@ -283,6 +284,32 @@ class NewsContext:
         @app.get('/api/context/news')
         async def news():
             return await self.fetch(days=3)
+
+        @app.post('/api/context/script')
+        async def script():
+            current = self.status()
+            if not current.get('include_in_voice'):
+                raise HTTPException(400, 'Ative “Incluir manchetes na voz” e salve antes de gerar o roteiro.')
+            match_key = self._current_match_key()
+            if not match_key or current.get('match_key') != match_key:
+                raise HTTPException(409, 'Pesquise novamente as notícias da partida atual antes de gerar o roteiro.')
+            articles = current.get('articles') or []
+            if not articles:
+                raise HTTPException(400, 'Não há notícias recentes para montar o roteiro. Faça a pesquisa primeiro.')
+            if not self.brain:
+                raise HTTPException(503, 'A integração com a LLM não está disponível neste servidor.')
+            facts = self._facts(articles)
+            script_articles = [{**article, 'id': fact['id']} for article, fact in zip(articles, facts)]
+            context = {'times': self._teams(), 'competição': self.clean(self.state.get('competition'), 100),
+                       'temporada': self._season_year(), 'placar_atual': self.state.get('home', {}).get('score'),
+                       'fase': self.clean(self.state.get('phase'), 30)}
+            segments = await self.brain.news_script(script_articles, context)
+            if match_key != self._current_match_key():
+                raise HTTPException(409, 'A partida mudou durante a gera????o. Pesquise as not??cias novamente.')
+            script_id = hashlib.sha256((match_key + str(current.get('updated_at')) +
+                                         ''.join(item.get('id', '') for item in script_articles)).encode('utf-8')).hexdigest()[:24]
+            return {'script_id': script_id, 'match_key': match_key, 'segments': segments,
+                    'segment_count': len(segments), 'headline_count': len(articles), 'max_age_days': 3}
 
         @app.get('/api/context/status')
         async def status():

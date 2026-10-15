@@ -2,9 +2,9 @@
 
 Programa local para OBS/YouTube com placar, estatísticas, lances e narração por voz. Gráficos em `/overlay` e áudio independente em `/audio`.
 
-## GE e áudio direto no OBS
+## Áudio direto no OBS
 
-1. Selecione uma partida em **Carregar e acompanhar**. A busca GE confere os dois times e o horário na agenda pública. Se não localizar, informe o link da mesma partida em **Informar cobertura do GE manualmente**.
+1. Selecione uma partida em **Carregar e acompanhar**. A busca GE confere os dois times e o horário na agenda pública. Se não localizar, informe o link da mesma partida em **Informar cobertura manualmente**.
 2. O programa consulta a página pública a cada **30 segundos**, mostra os lances em **Últimos lances** e narra os novos textos recebidos. O canal direto retornou HTTP 403 no teste; esta versão não o utiliza. O atraso da publicação e do cache do GE também conta.
 3. **Intervalo entre comentários → Sem comentários por intervalo** desliga os panoramas periódicos. Os lances continuam sendo lidos ao chegar à fila, uma voz por vez, com prioridade para gols.
 4. Em **Saída do áudio**, selecione **Diretamente no OBS** e clique em **Iniciar narração**. No OBS, adicione uma **Fonte de navegador** com `http://127.0.0.1:8787/audio` e marque **Controlar áudio via OBS**. Essa fonte é transparente e tem seu próprio canal no mixer.
@@ -14,7 +14,7 @@ A página `/audio?monitor=1` mostra o estado do áudio e um botão para ativá-l
 
 As escalações são opcionais: **Ler automaticamente os titulares**, **Ler escalações agora** e **Pular escalações**. Os pedidos de like e inscrição podem ser ativados/desativados e espaçados em 5, 10 ou 15 minutos; entram nas pausas e cedem lugar aos lances.
 
-A leitura GE exige o Microsoft Edge instalado. O programa abre uma instância invisível, sem JavaScript, para ler somente as páginas públicas. Se houver recusa de acesso, a cobertura para e os eventos da fonte principal continuam. Fotos, textos e serviços externos têm condições de reutilização próprias. Detalhes em [GE e OBS](docs/GE_OBS.md).
+A leitura  exige o Microsoft Edge instalado. O programa abre uma instância invisível, sem JavaScript, para ler somente as páginas públicas. Se houver recusa de acesso, a cobertura para e os eventos da fonte principal continuam. Fotos, textos e serviços externos têm condições de reutilização próprias. Detalhes em [OBS](docs/GE_OBS.md).
 
 ## Organização dos arquivos
 
@@ -25,7 +25,7 @@ A leitura GE exige o Microsoft Edge instalado. O programa abre uma instância in
 | `main.py`, `launcher.py` | Entrada do servidor e inicialização. |
 | `backend/` | Fontes de dados, narração, vozes, aparência e contexto. |
 | `static/` | Painel, overlay e página de áudio. |
-| `tools/` | Instaladores Python e diagnóstico manual do GE. |
+| `tools/` | Instaladores Python e diagnóstico manual. |
 | `tests/` | Testes automatizados. |
 | `docs/` | Guias, estudos, licenças e roteiro original. |
 | `models/` | Modelos de voz; arquivos locais de LLM existentes não são executados pelo programa. |
@@ -142,7 +142,7 @@ Se aparecer só Faber, clique em **Verificar vozes instaladas** e atualize a pá
 
 Ao interromper uma fala, a geração que já começou pode levar alguns segundos para terminar no computador. O próximo pedido aguarda no servidor, com prioridade para gols e limite de espera, em vez de repetir solicitações a cada 250 ms. Pedidos cancelados durante essa espera são descartados. O painel distingue **Gerando a voz** de **Narrando**; em caso de sobrecarga, informa a espera e limita as novas tentativas.
 
-O estudo das alternativas de APIs, GE/Lance e scraping está em [estudo de viabilidade](docs/VIABILIDADE.md).
+O estudo das alternativas de APIs, Lance e scraping está em [estudo de viabilidade](docs/VIABILIDADE.md).
 
 ## Outras fontes e comparação
 

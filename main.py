@@ -160,7 +160,7 @@ coach_overrides = CoachOverrides(BASE, state, broadcast)
 coach_overrides.install(app)
 youtube_chat = YouTubeLiveChat(state, broadcast, BASE)
 youtube_chat.install(app)
-news_context = NewsContext(state, broadcast, BASE)
+news_context = NewsContext(state, broadcast, BASE, local_brain)
 news_context.install(app)
 
 @app.get("/favicon.ico", include_in_schema=False, status_code=204)
