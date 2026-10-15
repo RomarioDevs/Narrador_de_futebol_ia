@@ -25,6 +25,7 @@ class NarrationSettings(BaseModel):
     style: Literal["events", "radio"] = "radio"
     commentaryInterval: Literal[0, 30, 60, 90, 120] = 0
     delivery: Literal["natural", "dynamic"] = "dynamic"
+    commentaryProfile: Literal["balanced", "radio", "tactical", "enthusiastic", "concise"] = "balanced"
     brain: bool = True
     curiosities: bool = True
     announceLineups: bool = False

@@ -20,7 +20,7 @@ class BrainOutput {
   signal.addEventListener('abort',cancel,{once:true});
   if(signal.aborted)controller.abort();
   const timeout=setTimeout(cancel,13000);
-  const payload={text:item.text,kind:item.kind};
+  const payload={text:item.text,kind:item.kind,profile:state?.narration?.commentaryProfile||'balanced'};
   if(item.panorama&&item.kind==='analysis'&&state?.phase!=='pre'){
    const radio=new RadioCommentary();
    payload.choices=radio.candidates(state).slice(0,8).map(fact=>fact.text);

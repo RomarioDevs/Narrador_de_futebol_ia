@@ -157,7 +157,7 @@ player_photos.install(app)
 from backend.coach_overrides import CoachOverrides
 coach_overrides = CoachOverrides(BASE, state, broadcast)
 coach_overrides.install(app)
-youtube_chat = YouTubeLiveChat(state, broadcast)
+youtube_chat = YouTubeLiveChat(state, broadcast, BASE)
 youtube_chat.install(app)
 news_context = NewsContext(state)
 news_context.install(app)

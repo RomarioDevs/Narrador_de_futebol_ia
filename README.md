@@ -64,7 +64,7 @@ Na aba **04 · Manual**, use **Enviar lance para a transmissão** para informar 
 
 O leitor oficial do Live Chat pode ser ativado com `YOUTUBE_API_KEY` e `YOUTUBE_LIVE_CHAT_ID` no `.env`. Ele reconhece `!placar`, `!jogador`, `!pergunta`, `!narrar` e `!escalação`, limita respostas repetidas por usuário e nunca altera o placar. O chat fica atrás de gols, cartões e VAR na fila de narração. A chave e o `liveChatId` devem ser obtidos no Google Cloud/YouTube; não coloque esses valores no Git.
 
-No endereço `http://127.0.0.1:8787/control`, a aba **01 · Partida** mostra o card **Interação com a live**. Ele exibe os três jogadores mais mencionados, atualizados a partir dos nomes confirmados na escalação. O card **Contexto editorial** busca notícias dos últimos 3 dias ou da semana quando `NEWS_API_KEY` está configurada. A IA local (`Qwen3 · cérebro local`, usando o runtime llama instalado) recebe os fatos como opções e escolhe os dados para um comentário mais dinâmico, sem inventar números, lesões, resultados ou lances.
+No endereço `http://127.0.0.1:8787/control`, a aba **06 · Live** salva `YOUTUBE_API_KEY` e `YOUTUBE_LIVE_CHAT_ID` por partida, no arquivo local `youtube_live.json`, e mostra os três jogadores mais mencionados. A aba **07 · Notícias** busca notícias dos últimos 3 dias ou da semana quando `NEWS_API_KEY` está configurada. A aba **08 · Notas** concentra repertório, comentários rápidos e patrocínios. A IA local (`Qwen3 · cérebro local`, usando o runtime llama instalado) recebe os fatos como opções e escolhe os dados para um comentário mais dinâmico, sem inventar números, lesões, resultados ou lances.
 
 ## Formação, fotos e informações dos jogadores
 

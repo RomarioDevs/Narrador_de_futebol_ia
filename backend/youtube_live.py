@@ -4,6 +4,7 @@ Uses the official liveChatMessages.list endpoint when YOUTUBE_API_KEY and
 YOUTUBE_LIVE_CHAT_ID are configured. It never changes the match score.
 """
 import asyncio
+import json
 import os
 import re
 import time
@@ -23,9 +24,14 @@ def clean_text(value: Any, limit: int = 240) -> str:
 
 
 class YouTubeLiveChat:
-    def __init__(self, state, broadcast):
+    def __init__(self, state, broadcast, base=None):
         self.state = state
         self.broadcast = broadcast
+        self.settings_path = (base / "youtube_live.json") if base else None
+        try:
+            self.saved_settings = json.loads(self.settings_path.read_text(encoding="utf-8")) if self.settings_path else {}
+        except (OSError, ValueError):
+            self.saved_settings = {}
         self.task = None
         self.next_page = ""
         self.seen: set[str] = set()
@@ -35,8 +41,16 @@ class YouTubeLiveChat:
         self.info = {"enabled": False, "connected": False, "messages": 0, "error": None}
         self.state["youtube_chat"] = dict(self.info)
 
+    def match_key(self):
+        return "|".join(str(self.state.get(key, "")) if key == "competition" else str(self.state.get(key, {}).get("name", "")) for key in ("competition", "home", "away"))
+
+    def config(self):
+        saved = self.saved_settings.get(self.match_key(), {})
+        return {"api_key": str(saved.get("api_key") or os.getenv("YOUTUBE_API_KEY", "")).strip(), "live_chat_id": str(saved.get("live_chat_id") or os.getenv("YOUTUBE_LIVE_CHAT_ID", "")).strip()}
+
     def configured(self):
-        return bool(os.getenv("YOUTUBE_API_KEY", "").strip() and os.getenv("YOUTUBE_LIVE_CHAT_ID", "").strip())
+        current = self.config()
+        return bool(current["api_key"] and current["live_chat_id"])
 
     def status(self):
         return {**self.info, "configured": self.configured(), "chat_id": bool(os.getenv("YOUTUBE_LIVE_CHAT_ID", "").strip()), "top_players": self.top_players(), "top_players_by_window": {str(window): self.top_players(window) for window in (5, 15, 30)}}
@@ -110,8 +124,8 @@ class YouTubeLiveChat:
         return None
 
     async def poll(self):
-        key = os.getenv("YOUTUBE_API_KEY", "").strip()
-        chat_id = os.getenv("YOUTUBE_LIVE_CHAT_ID", "").strip()
+        config = self.config()
+        key, chat_id = config["api_key"], config["live_chat_id"]
         params = {"liveChatId": chat_id, "part": "snippet,authorDetails", "maxResults": 200, "key": key}
         if self.next_page:
             params["pageToken"] = self.next_page
@@ -179,6 +193,20 @@ class YouTubeLiveChat:
     def install(self, app):
         @app.get("/api/youtube/status")
         async def status():
+            return self.status()
+
+        @app.post("/api/youtube/config")
+        async def config(payload: dict):
+            api_key = clean_text(payload.get("api_key"), 300)
+            live_chat_id = clean_text(payload.get("live_chat_id"), 200)
+            if api_key and len(api_key) < 10:
+                return {"error": "A chave do YouTube parece incompleta.", **self.status()}
+            if live_chat_id and len(live_chat_id) < 3:
+                return {"error": "O liveChatId parece incompleto.", **self.status()}
+            self.saved_settings[self.match_key()] = {"api_key": api_key, "live_chat_id": live_chat_id}
+            if self.settings_path:
+                self.settings_path.write_text(json.dumps(self.saved_settings, ensure_ascii=False, indent=2), encoding="utf-8")
+            await self.stop()
             return self.status()
 
         @app.get("/api/youtube/top-players")

@@ -3,7 +3,7 @@ const narrationSession=new NarrationSession({output:'control',onChange:renderNar
 const matchNarrator=narrationSession.narrator,speechOutput=narrationSession.speech,brainOutput=narrationSession.brain;
 let settingsReady=false,saveTimer,saveChain=Promise.resolve();
 const narrationInputs={narrationVoice:'voice',commentaryVoice:'commentaryVoice',narrationRate:'rate',narrationVolume:'volume',
- narrationStyle:'style',narrationInterval:'commentaryInterval',narrationDelivery:'delivery',narrationOutput:'output',
+ narrationStyle:'style',narrationInterval:'commentaryInterval',narrationDelivery:'delivery',narrationProfile:'commentaryProfile',narrationOutput:'output',
  narrationBrain:'brain',narrationCuriosities:'curiosities',announceLineups:'announceLineups',
  narrationEngagement:'engagement',engagementInterval:'engagementInterval',narrationPlayerFocus:'playerFocus'};
 
