@@ -109,7 +109,7 @@ class LeaseRequest(BaseModel):
 
 
 class ChannelCommand(BaseModel):
-    action: Literal["lineups", "skip_lineups", "panorama", "skip", "repeat", "stage"]
+    action: Literal["lineups", "skip_lineups", "panorama", "skip", "repeat", "replay_short", "replay_detail", "replay_tactical", "stage"]
 
 
 class NarrationChannel:

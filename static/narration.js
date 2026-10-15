@@ -91,6 +91,14 @@ class MatchNarrator {
   this.interruptAnalysis();
   this.enqueue('Repetindo o último lance. '+this.lastEvent.text,'event',{...this.lastEvent,replay:true,text:'Repetindo o último lance. '+this.lastEvent.text,created:Date.now(),kind:'event'});
  }
+ replay(mode='short',s=this.currentState){
+  if(!this.lastEvent)throw new Error('Nenhum lance disponível para replay.');
+  if(this.paused)throw new Error('Retome a voz para reproduzir o replay.');
+  if(!this.enabled)throw new Error('Inicie a narração para reproduzir o replay.');
+  const base=this.lastEvent.text, score=this.scoreboard(s), prefix=mode==='detail'?'Vamos rever o lance. ':mode==='tactical'?'Na leitura da jogada. ':'Replay do lance. ';
+  const suffix=mode==='detail'?` ${score}`:mode==='tactical'?` ${score} A informação é baseada no lance registrado, sem inferir movimentos não informados.`:'';
+  this.interruptAnalysis();this.enqueue(prefix+base+suffix,'event',{replay:true,urgent:true});
+ }
  readStage(s=this.currentState){
   if(this.paused)throw new Error('Retome a voz para ler o roteiro.');
   if(!this.enabled&&s?.phase==='post'){this.requireVoice();this.enabled=true;this.finishAfterDrain=true;}

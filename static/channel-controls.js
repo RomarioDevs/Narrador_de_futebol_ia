@@ -156,6 +156,9 @@ $('startNarration').onclick=narrationAction(async()=>{if(narrationSession.settin
 $('stopNarration').onclick=narrationAction(async()=>{matchNarrator.stop();await narrationSession.save({enabled:false,paused:false});});
 $('hostCommentary').onclick=narrationAction(()=>narrationSession.save({paused:!narrationSession.settings.paused}));
 $('narrationPanorama').onclick=narrationAction(()=>narrationSession.commandAction('panorama'));
+$('replayShort').onclick=narrationAction(()=>narrationSession.commandAction('replay_short'));
+$('replayDetail').onclick=narrationAction(()=>narrationSession.commandAction('replay_detail'));
+$('replayTactical').onclick=narrationAction(()=>narrationSession.commandAction('replay_tactical'));
 $('readLineups').onclick=narrationAction(()=>narrationSession.commandAction('lineups'));
 $('skipLineups').onclick=narrationAction(()=>narrationSession.commandAction('skip_lineups'));
 $('useDynamicVoice').onclick=narrationAction(()=>narrationSession.save({voice:'kokoro:pm_alex',commentaryVoice:'kokoro:pf_dora',delivery:'dynamic',rate:1}));
