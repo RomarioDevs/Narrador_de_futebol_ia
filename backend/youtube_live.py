@@ -7,6 +7,7 @@ import asyncio
 import os
 import re
 import time
+from collections import deque
 from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
@@ -30,6 +31,7 @@ class YouTubeLiveChat:
         self.seen: set[str] = set()
         self.last_user: dict[str, float] = {}
         self.mentions: dict[str, dict[str, Any]] = {}
+        self.message_fingerprints: dict[str, float] = {}
         self.info = {"enabled": False, "connected": False, "messages": 0, "error": None}
         self.state["youtube_chat"] = dict(self.info)
 
@@ -37,7 +39,7 @@ class YouTubeLiveChat:
         return bool(os.getenv("YOUTUBE_API_KEY", "").strip() and os.getenv("YOUTUBE_LIVE_CHAT_ID", "").strip())
 
     def status(self):
-        return {**self.info, "configured": self.configured(), "chat_id": bool(os.getenv("YOUTUBE_LIVE_CHAT_ID", "").strip()), "top_players": self.top_players()}
+        return {**self.info, "configured": self.configured(), "chat_id": bool(os.getenv("YOUTUBE_LIVE_CHAT_ID", "").strip()), "top_players": self.top_players(), "top_players_by_window": {str(window): self.top_players(window) for window in (5, 15, 30)}}
 
     def _player_names(self):
         names = []
@@ -49,15 +51,28 @@ class YouTubeLiveChat:
         return names
 
     def track_mentions(self, text: str):
+        now = time.time()
         folded = text.casefold()
         for name in self._player_names():
             if name.casefold() not in folded:
                 continue
-            entry = self.mentions.setdefault(name, {"name": name, "count": 0})
+            entry = self.mentions.setdefault(name, {"name": name, "count": 0, "times": deque()})
+            if entry["times"] and now - entry["times"][-1] < 2:
+                continue
+            entry["times"].append(now)
             entry["count"] += 1
 
-    def top_players(self):
-        return sorted(self.mentions.values(), key=lambda item: (-item["count"], item["name"].casefold()))[:3]
+    def top_players(self, window_minutes=0):
+        now = time.time()
+        result = []
+        for entry in self.mentions.values():
+            if window_minutes:
+                while entry["times"] and now - entry["times"][0] > window_minutes * 60:
+                    entry["times"].popleft()
+            count = len(entry["times"]) if window_minutes else entry["count"]
+            if count:
+                result.append({"name": entry["name"], "count": count})
+        return sorted(result, key=lambda item: (-item["count"], item["name"].casefold()))[:3]
 
     def make_event(self, text: str, author: str, kind: str = "event"):
         return {
@@ -119,6 +134,12 @@ class YouTubeLiveChat:
                     snippet = item.get("snippet", {})
                     author = clean_text(item.get("authorDetails", {}).get("displayName", "espectador"), 80)
                     text = clean_text(snippet.get("displayMessage", ""))
+                    fingerprint = (author + ":" + text).casefold()
+                    now = time.time()
+                    self.message_fingerprints = {key: stamp for key, stamp in self.message_fingerprints.items() if now - stamp < 30}
+                    if fingerprint in self.message_fingerprints:
+                        continue
+                    self.message_fingerprints[fingerprint] = now
                     self.track_mentions(text)
                     response = self.response_for(text, author)
                     self.info["messages"] += 1
