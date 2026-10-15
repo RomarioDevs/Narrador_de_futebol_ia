@@ -4,8 +4,10 @@ if __name__ == '__main__':
 
 import asyncio
 import os
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 import httpx
 from dotenv import load_dotenv
@@ -25,6 +27,7 @@ from backend.narration_channel import NarrationChannel
 from backend.rehearsal import Rehearsal
 from backend.player_profiles import PlayerProfiles
 from backend.player_photos import PlayerPhotos
+from backend.youtube_live import YouTubeLiveChat
 
 load_dotenv()
 BASE = Path(__file__).parent
@@ -83,6 +86,26 @@ def broadcast_state():
 class Patch(BaseModel):
     data: dict[str, Any]
 
+
+class ManualEvent(BaseModel):
+    minute: int | str = 0
+    icon: str = "●"
+    text: str = "Evento"
+    kind: str = "event"
+    team: str = ""
+    player: str = ""
+    speak: bool = True
+
+
+def normalize_event_kind(payload: ManualEvent) -> str:
+    if payload.kind in {"goal", "card", "substitution", "review", "cancelled", "correction", "event", "yellow", "red"}:
+        return "card" if payload.kind in {"yellow", "red"} else payload.kind
+    if payload.icon == "⚽":
+        return "goal"
+    if payload.icon in {"🟨", "🟥"}:
+        return "card"
+    return "event"
+
 def deep_update(dst: dict, src: dict):
     for k, v in src.items():
         if isinstance(v, dict) and isinstance(dst.get(k), dict):
@@ -133,6 +156,8 @@ player_photos.install(app)
 from backend.coach_overrides import CoachOverrides
 coach_overrides = CoachOverrides(BASE, state, broadcast)
 coach_overrides.install(app)
+youtube_chat = YouTubeLiveChat(state, broadcast)
+youtube_chat.install(app)
 
 @app.get("/favicon.ico", include_in_schema=False, status_code=204)
 async def favicon():
@@ -170,11 +195,20 @@ async def patch_state(patch: Patch):
     return state
 
 @app.post("/api/event")
-async def add_event(payload: dict[str, Any]):
+async def add_event(payload: ManualEvent):
+    kind = normalize_event_kind(payload)
     event = {
-        "minute": payload.get("minute", state.get("minute", 0)),
-        "text": payload.get("text", "Evento"),
-        "icon": payload.get("icon", "●"),
+        "id": "manual:" + str(uuid4()),
+        "minute": payload.minute if payload.minute != "" else state.get("minute", 0),
+        "text": payload.text.strip()[:900] or "Evento",
+        "icon": ("🟨" if payload.kind == "yellow" else "🟥" if payload.kind == "red" else "⚽" if payload.kind == "goal" else "↔" if payload.kind == "substitution" else "●" if payload.kind == "event" else "🔎"),
+        "kind": kind,
+        "team": payload.team.strip()[:120],
+        "player": payload.player.strip()[:120],
+        "speak": payload.speak,
+        "urgent": kind in {"goal", "review", "cancelled", "correction"},
+        "source": {"name": "Lance manual"},
+        "created_at": datetime.now(timezone.utc).isoformat(),
     }
     state["events"] = ([event] + state["events"])[:6]
     await broadcast()
@@ -297,3 +331,10 @@ async def api_loop():
 async def startup():
     if os.getenv("API_FOOTBALL_KEY", "").strip() and os.getenv("FIXTURE_ID", "").strip():
         asyncio.create_task(api_loop())
+    if youtube_chat.configured():
+        await youtube_chat.start()
+
+
+@app.on_event("shutdown")
+async def shutdown():
+    await youtube_chat.stop()

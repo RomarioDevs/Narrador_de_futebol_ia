@@ -58,6 +58,12 @@ Funciona sem nenhuma API. Você controla:
 - eventos;
 - posição visual da bola.
 
+Na aba **04 · Manual**, use **Enviar lance para a transmissão** para informar gol, cartão, substituição ou VAR. A **Cabine rápida** aceita os atalhos `G` (gol), `Y` (amarelo), `R` (vermelho), `V` (VAR), `S` (substituição) e `M` (silenciar). Os gols e revisões entram na frente da fila de áudio.
+
+## Chat opcional do YouTube
+
+O leitor oficial do Live Chat pode ser ativado com `YOUTUBE_API_KEY` e `YOUTUBE_LIVE_CHAT_ID` no `.env`. Ele reconhece `!placar`, `!jogador`, `!pergunta`, `!narrar` e `!escalação`, limita respostas repetidas por usuário e nunca altera o placar. O chat fica atrás de gols, cartões e VAR na fila de narração. A chave e o `liveChatId` devem ser obtidos no Google Cloud/YouTube; não coloque esses valores no Git.
+
 ## Formação, fotos e informações dos jogadores
 
 Na aba **05 · Formação**, o campo mostra os jogadores em atividade nas duas equipes. A disposição é aproximada, baseada na formação inicial e nas posições fornecidas pela ESPN; não é rastreamento ao vivo. Quando a fonte identifica quem substituiu quem, o novo jogador ocupa a vaga do anterior. Expulsos deixam o campo. Sem formação ou vínculo de substituição, os jogadores aparecem na lista **sem posição confirmada**.
