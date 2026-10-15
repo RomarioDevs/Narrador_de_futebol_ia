@@ -32,6 +32,9 @@ class RadioCommentary {
   }
   const accuracy=this.pair(s,'pass_accuracy',100);
   if(accuracy)add('accuracy',accuracy,`Precisão de passe: ${home}, ${this.number(accuracy[0])} por cento. ${away}, ${this.number(accuracy[1])} por cento.`);
+  const top=(s.youtube_chat?.top_players||[]).filter(item=>item?.name&&Number(item.count)>0).slice(0,3);
+  if(top.length)add('chat-top',top.map(item=>[item.name,item.count]),`No chat da transmissão, os nomes mais comentados são ${top.map(item=>`${item.name}, com ${item.count} menções`).join('; ')}.`);
+  for(const fact of (s.news_context?.facts||[]).slice(0,3))if(fact?.text)add('news:'+fact.id,[fact.id],fact.text);
   return result;
  }
  reset(s){this.reported=new Map(this.candidates(s).map(c=>[c.key,c.signature]));}
