@@ -27,6 +27,7 @@ from backend.narration_channel import NarrationChannel
 from backend.rehearsal import Rehearsal
 from backend.player_profiles import PlayerProfiles
 from backend.player_photos import PlayerPhotos
+from backend.youtube_live import YouTubeLiveChat
 
 load_dotenv()
 BASE = Path(__file__).parent
@@ -155,6 +156,8 @@ player_photos.install(app)
 from backend.coach_overrides import CoachOverrides
 coach_overrides = CoachOverrides(BASE, state, broadcast)
 coach_overrides.install(app)
+youtube_chat = YouTubeLiveChat(state, broadcast)
+youtube_chat.install(app)
 
 @app.get("/favicon.ico", include_in_schema=False, status_code=204)
 async def favicon():
@@ -328,3 +331,10 @@ async def api_loop():
 async def startup():
     if os.getenv("API_FOOTBALL_KEY", "").strip() and os.getenv("FIXTURE_ID", "").strip():
         asyncio.create_task(api_loop())
+    if youtube_chat.configured():
+        await youtube_chat.start()
+
+
+@app.on_event("shutdown")
+async def shutdown():
+    await youtube_chat.stop()
