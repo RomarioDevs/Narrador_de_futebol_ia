@@ -167,6 +167,19 @@ $('saveBrainSettings').onclick=narrationAction(async()=>{
  fillBrainSettings();showBrainStatus();notice('Configuração da IA salva. Agora teste a conexão.');
 });
 $('brainConnection').onchange=()=>{$('brainBaseUrl').placeholder=$('brainConnection').value==='local'?'http://127.0.0.1:1234/v1':'https://provedor.com/v1';};
+$('loadBrainModels').onclick=narrationAction(async()=>{
+ const button=$('loadBrainModels');button.disabled=true;button.textContent='Buscando modelos…';
+ try{
+  const models=await brainOutput.listModels({connection:$('brainConnection').value,base_url:$('brainBaseUrl').value.trim(),api_key:$('brainApiKey').value||null});
+  const choices=$('brainModelChoices');choices.replaceChildren();
+  for(const id of models){const option=new Option(id,id);choices.add(option);}
+  $('brainModelListLabel').hidden=false;
+  const current=$('brainModel').value.trim();choices.value=models.includes(current)?current:models[0];
+  $('brainModel').value=choices.value;
+  notice(`Encontrados ${models.length} modelos. Selecione o desejado na lista.`);
+ }finally{button.disabled=false;button.textContent='Buscar modelos disponíveis';}
+});
+$('brainModelChoices').onchange=()=>{$('brainModel').value=$('brainModelChoices').value;};
 $('prepareBrain').onclick=narrationAction(async()=>{try{await brainOutput.prepare();}finally{showBrainStatus();}});
 $('saveCommentLibrary').onclick=narrationAction(async()=>{
  const team=$('commentLibraryTeam').value.trim();

@@ -84,6 +84,13 @@ class BrainSettingsRequest(BaseModel):
         return self
 
 
+class BrainModelsRequest(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True, extra='forbid')
+    connection: Literal['local', 'api'] = 'local'
+    base_url: str = Field(min_length=1, max_length=500)
+    api_key: SecretStr | None = None
+
+
 def assemble(payload, plan):
     """Reject any model-invented prose, fact, number, or index before it reaches TTS."""
     choices = payload.choices if payload.kind == 'analysis' and payload.choices else [payload.text]
@@ -237,6 +244,28 @@ class LocalBrain:
         @app.post('/api/brain/settings')
         async def brain_settings(payload: BrainSettingsRequest):
             return self.save_settings(payload)
+
+        @app.post('/api/brain/models')
+        async def brain_models(payload: BrainModelsRequest):
+            # Reuse the same URL and local/online restrictions as saved settings.
+            settings = BrainSettingsRequest(connection=payload.connection, base_url=payload.base_url, model='model-list')
+            key = (payload.api_key.get_secret_value().strip() if payload.api_key else '') or self._api_key()
+            headers = {'Authorization': 'Bearer ' + key} if key else {}
+            try:
+                async with httpx.AsyncClient(timeout=10, trust_env=False) as client:
+                    response = await client.get(settings.base_url + '/models', headers=headers)
+                if response.status_code in (401, 403):
+                    raise HTTPException(502, 'O servidor recusou a chave da API. Confira a chave e tente novamente.')
+                response.raise_for_status()
+                data = response.json().get('data', [])
+                models = [item['id'] for item in data if isinstance(item, dict) and isinstance(item.get('id'), str) and item['id'].strip()]
+                if not models:
+                    raise HTTPException(502, 'O servidor respondeu, mas não listou modelos. Carregue um modelo no LM Studio e tente novamente.')
+                return {'models': models}
+            except HTTPException:
+                raise
+            except (httpx.HTTPError, ValueError, TypeError) as exc:
+                raise HTTPException(502, 'Não foi possível listar os modelos. Confira a URL, a porta e se o servidor do LM Studio está iniciado.') from exc
 
         @app.post('/api/brain/start')
         @app.post('/api/brain/test')

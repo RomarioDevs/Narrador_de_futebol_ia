@@ -1,4 +1,23 @@
 // Optional API-backed planning. A canceled or slow plan cannot hold up the match narration.
+function brainErrorMessage(detail,fallback){
+ if(typeof detail==='string'&&detail.trim())return detail;
+ if(Array.isArray(detail)){
+  const messages=detail.map(item=>{
+   if(typeof item==='string')return item;
+   if(item&&typeof item==='object'){
+    const location=Array.isArray(item.loc)?item.loc.filter(part=>part!=='body').join(' → '):'';
+    const message=typeof item.msg==='string'?item.msg:'';
+    return [location,message].filter(Boolean).join(': ');
+   }
+   return '';
+  }).filter(Boolean);
+  if(messages.length)return messages.join('; ');
+ }
+ if(detail&&typeof detail==='object'){
+  for(const key of ['message','error','msg','detail'])if(typeof detail[key]==='string'&&detail[key].trim())return detail[key];
+ }
+ return fallback;
+}
 class BrainOutput {
  constructor(){this.enabled=true;this.status=null;this.message='Verificando a configuração da IA…';}
  async load(){
@@ -11,14 +30,20 @@ class BrainOutput {
  async saveSettings(settings){
   const response=await fetch('/api/brain/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(settings)});
   const body=await response.json().catch(()=>({}));
-  if(!response.ok)throw new Error(body.detail||'Não foi possível salvar a configuração da IA.');
+  if(!response.ok)throw new Error(brainErrorMessage(body.detail,'Não foi possível salvar a configuração da IA.'));
   this.status=body;this.message=body.message;
   return body;
+ }
+ async listModels(settings){
+  const response=await fetch('/api/brain/models',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(settings)});
+  const body=await response.json().catch(()=>({}));
+  if(!response.ok)throw new Error(brainErrorMessage(body.detail,'Não foi possível buscar os modelos.'));
+  return Array.isArray(body.models)?body.models:[];
  }
  async prepare(){
   const response=await fetch('/api/brain/test',{method:'POST'});
   const body=await response.json().catch(()=>({}));
-  if(!response.ok){this.message=body.detail||'Não foi possível conectar à IA.';if(this.status)this.status={...this.status,ready:false,message:this.message};throw new Error(this.message);}
+  if(!response.ok){this.message=brainErrorMessage(body.detail,'Não foi possível conectar à IA.');if(this.status)this.status={...this.status,ready:false,message:this.message};throw new Error(this.message);}
   this.status=body;this.message=body.message;
  }
  async compose(item,state,signal){
