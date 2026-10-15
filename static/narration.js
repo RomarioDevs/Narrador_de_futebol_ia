@@ -431,6 +431,8 @@ class MatchNarrator {
   if(this.style==='radio'||this.delivery==='dynamic'){
    if(this.eventKind(event)==='goal')text=text.replace(/^Gol(?:\s+contra|\s+de cabeça)?\.?\s*/i,match=>/contra/i.test(match)?'Gol contra! ':/cabeça/i.test(match)?'Gol de cabeça! ':this.delivery==='dynamic'?['É gol! ','Bola na rede! ','Saiu o gol! '][(this.goalCount||0)%3]:'É gol! ');
    else if(/^Cartão (amarelo|vermelho)\./i.test(text))text=text.replace(/^Cartão (amarelo|vermelho)\.\s*/i,'Cartão $1 para ');
+   else if(this.eventKind(event)==='review')text='Atenção: '+text.replace(/^VAR[.!]?\s*/i,'VAR em análise. ');
+   else if(this.eventKind(event)==='substitution'&&!/^Substituição/i.test(text))text='Substituição. '+text;
   }
   return this.delivery==='dynamic'&&this.eventKind(event)==='goal'?text.replace(/[.!?]\s*$/,'')+'. '+when.trim():when+text;
  }
