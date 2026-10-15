@@ -115,6 +115,7 @@ def deep_update(dst: dict, src: dict):
             dst[k] = v
 
 async def broadcast():
+    news_context.observe()
     club_context.observe(state)
     coach_overrides.observe()
     ge_feed.observe()
@@ -159,7 +160,7 @@ coach_overrides = CoachOverrides(BASE, state, broadcast)
 coach_overrides.install(app)
 youtube_chat = YouTubeLiveChat(state, broadcast, BASE)
 youtube_chat.install(app)
-news_context = NewsContext(state)
+news_context = NewsContext(state, broadcast, BASE)
 news_context.install(app)
 
 @app.get("/favicon.ico", include_in_schema=False, status_code=204)

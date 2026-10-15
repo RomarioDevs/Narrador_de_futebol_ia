@@ -5,6 +5,7 @@ __pycache__/
 models/
 narration.json
 brain.json
+news_context.json
 artifacts/
 player_photos.json
 coach_overrides.json

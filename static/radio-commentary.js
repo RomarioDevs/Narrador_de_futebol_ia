@@ -11,7 +11,7 @@ class RadioCommentary {
  candidates(s){
   const result=[],home=s.home.name,away=s.away.name;
   const shots=this.pair(s,'shots'),on=this.pair(s,'shots_on'),possession=this.pair(s,'possession',100);
-  const add=(key,values,text)=>result.push({key,signature:JSON.stringify(values),text});
+  const add=(key,values,text,source={name:s.source||'Dados da partida'})=>result.push({key,id:key,signature:JSON.stringify(values),text,source});
   if(shots){
    const validOn=on&&on.every((v,i)=>v<=shots[i]);
    let text=`Nas finalizações, ${home} tem ${this.number(shots[0])} e ${away}, ${this.number(shots[1])}.`;
@@ -32,6 +32,15 @@ class RadioCommentary {
   }
   const accuracy=this.pair(s,'pass_accuracy',100);
   if(accuracy)add('accuracy',accuracy,`Precisão de passe: ${home}, ${this.number(accuracy[0])} por cento. ${away}, ${this.number(accuracy[1])} por cento.`);
+  if(s.phase==='pre')for(const side of ['home','away']){
+   const rows=(s.recent_form?.[side]||[]).filter(row=>['V','E','D'].includes(row.result)).slice(0,5);
+   if(rows.length){
+    const counts={V:0,E:0,D:0};rows.forEach(row=>counts[row.result]++);
+    const latest=rows[0];
+    const recent=latest?.opponent?` O resultado mais recente foi ${latest.result} contra ${latest.opponent}${latest.score?`, por ${latest.score}`:''}${latest.competition?`, em ${latest.competition}`:''}.`:'';
+    add(`form:${side}`,rows.map(row=>[row.result,row.opponent,row.score,row.date]),`Nos últimos ${rows.length} resultados informados para ${s[side].name}: ${counts.V} vitórias, ${counts.E} empates e ${counts.D} derrotas.${recent}`,{name:s.data_sources?.recent_form||s.source||'ESPN'});
+   }
+  }
   const top=(s.youtube_chat?.top_players||[]).filter(item=>item?.name&&Number(item.count)>0).slice(0,3);
   if(top.length)add('chat-top',top.map(item=>[item.name,item.count]),`No chat da transmissão, os nomes mais comentados são ${top.map(item=>`${item.name}, com ${item.count} menções`).join('; ')}.`);
   const players=[...['home','away'].flatMap(side=>[...(s.lineups?.[side]?.starters||[]),...(s.lineups?.[side]?.bench||[])])];
@@ -42,7 +51,7 @@ class RadioCommentary {
    if(stats.shots!=null)parts.push(`${stats.shots} finalização(ões)`);
    if(parts.length)add('player:'+player.id,parts,`${player.name} aparece nas estatísticas da partida com ${parts.join(', ')}.`);
   });
-  for(const fact of (s.news_context?.facts||[]).slice(0,3))if(fact?.text)add('news:'+fact.id,[fact.id],fact.text);
+  if(s.news_context?.include_in_voice===true)for(const fact of (s.news_context.facts||[]).slice(0,3))if(fact?.text)add('news:'+fact.id,[fact.id],fact.text,fact.source||{name:'Notícia'});
   return result;
  }
  reset(s){this.reported=new Map(this.candidates(s).map(c=>[c.key,c.signature]));}
@@ -50,7 +59,7 @@ class RadioCommentary {
   const candidate=this.candidates(s).find(c=>this.reported.get(c.key)!==c.signature);
   if(!candidate)return '';
   this.reported.set(candidate.key,candidate.signature);
-  return 'Vamos aos números da partida. '+candidate.text;
+  return {...candidate,text:candidate.text};
  }
  score(s){
   if([s.home.score,s.away.score].some(v=>v==null||v===''||!Number.isFinite(Number(v))))return 'Placar não informado.';
@@ -84,6 +93,12 @@ class RadioCommentary {
     const coach=s.lineups?.[side]?.coach;
     const name=typeof coach==='string'?coach:coach?.name;
     if(name)parts.push(`${s[side].name} tem no comando ${name}.`);
+    const form=(s.recent_form?.[side]||[]).filter(row=>['V','E','D'].includes(row.result)).slice(0,5);
+    if(form.length){
+     const counts={V:0,E:0,D:0};form.forEach(row=>counts[row.result]++);
+     const latest=form[0];
+     parts.push(`Nos últimos ${form.length} resultados informados, ${s[side].name} teve ${counts.V} vitórias, ${counts.E} empates e ${counts.D} derrotas.${latest?.opponent?` O mais recente foi ${latest.result} contra ${latest.opponent}${latest.score?`, por ${latest.score}`:''}.`:''}`);
+    }
     const table=s.standings?.[side];
     if(table?.rank&&table.points!=null)parts.push(`Na tabela informada do campeonato, ${s[side].name} ocupa a posição ${table.rank}, com ${table.points} pontos.`);
    }

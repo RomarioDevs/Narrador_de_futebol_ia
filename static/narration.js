@@ -415,10 +415,10 @@ class MatchNarrator {
     const clubFacts=facts.filter(f=>!f.player_id);
     const curiosityTurn=cycle % 5 === 0;
     const fact = curiosityTurn ? (playerFacts[0] || clubFacts[0]) : (fresh ? this.radio.next(s) : null);
-    if(fact && typeof fact === 'object'){comment=fact.text;source=fact.source;this.contextSeen.set(fact.id,Date.now());}
+    if(fact && typeof fact === 'object'){comment=fact.text;source=fact.source;this.contextSeen.set(fact.id||fact.key,Date.now());}
    }
   }
-  if(!comment&&fresh){comment=this.radio.next(s);}
+  if(!comment&&fresh){const fact=this.radio.next(s);if(fact){comment=fact.text;source=fact.source;}}
   if(!comment&&this.style==='radio'&&(!s.stats||Object.keys(s.stats||{}).length===0)&&(cycle===0||cycle===5)){
    comment=this.radio.snapshot(s);source={name:'panorama'};
   }

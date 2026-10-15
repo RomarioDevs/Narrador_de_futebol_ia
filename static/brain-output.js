@@ -52,12 +52,12 @@ class BrainOutput {
   signal.addEventListener('abort',cancel,{once:true});
   if(signal.aborted)controller.abort();
   const timeout=setTimeout(cancel,13000);
-  const payload={text:item.text,kind:item.kind,profile:state?.narration?.commentaryProfile||'balanced'};
-  if(item.panorama&&item.kind==='analysis'&&state?.phase!=='pre'){
+  const payload={text:item.text,kind:item.kind,profile:state?.narration?.commentaryProfile||'balanced',anchor_output:item.panorama===true};
+  if(item.kind==='analysis'&&state){
    const radio=new RadioCommentary();
-   payload.choices=radio.candidates(state).slice(0,8).map(fact=>fact.text);
-   const moment=state.phase==='post'?'Partida encerrada.':state.status==='INTERVALO'?'Intervalo.':state.source==='manual'?'Dados do controle manual.':radio.clock(state)?`Na última atualização, ${radio.clock(state)}.`:'Na última informação recebida.';
-   payload.anchor=moment+' '+radio.score(state);
+   payload.choices=[...new Set([item.text,...radio.candidates(state).map(fact=>fact.text)])].slice(0,8);
+   const moment=state.phase==='pre'?'Pré-jogo.':state.phase==='post'?'Partida encerrada.':state.status==='INTERVALO'?'Intervalo.':radio.clock(state)?`Na última atualização, ${radio.clock(state)}.`:'Na última informação recebida.';
+   payload.anchor=`${state.home?.name||''} e ${state.away?.name||''}. ${moment} ${radio.score(state)}`;
   }
   try{
    const response=await fetch('/api/brain/compose',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload),signal:controller.signal});

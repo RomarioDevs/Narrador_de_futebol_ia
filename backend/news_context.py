@@ -1,76 +1,249 @@
-"""Optional, attributed news context for the local brain.
-
-News is never treated as a live event. It is fetched on demand and exposed as
-facts with title, source and publication date for the local planner.
-"""
-from datetime import datetime, timedelta, timezone
-import os
+"""Free RSS headline discovery for match context; headlines are never live events."""
+import asyncio
+from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
+import hashlib
+import json
+from pathlib import Path
 import re
-from typing import Any
+import time
+from typing import Literal
 from urllib.parse import urlparse
+import xml.etree.ElementTree as ET
 
 import httpx
+from fastapi import HTTPException
+from pydantic import BaseModel, ConfigDict, Field
+
+
+PUBLISHERS = {
+    'ge': ('GE', ('ge.globo.com',)),
+    'espn': ('ESPN', ('espn.com.br', 'espn.com')),
+    'uol': ('UOL', ('uol.com.br',)),
+    'official': ('Clubes e entidades', ('cbf.com.br', 'fifa.com', 'premierleague.com', 'uefa.com', 'conmebol.com')),
+    'other': ('Outros veículos gratuitos', ('lance.com.br', 'terra.com.br', 'band.uol.com.br', 'cnnbrasil.com.br')),
+}
+KNOWN_DOMAINS = {domain for _, domains in PUBLISHERS.values() for domain in domains}
+
+
+class NewsSettingsRequest(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True, extra='forbid')
+    auto_refresh: bool = False
+    include_in_voice: bool = False
+    publishers: list[Literal['ge', 'espn', 'uol', 'official', 'other']] = Field(
+        default_factory=lambda: ['ge', 'espn', 'uol', 'official', 'other'], min_length=1, max_length=5)
 
 
 class NewsContext:
-    TRUSTED_DOMAINS = {"fifa.com", "cbf.com.br", "ge.globo.com", "globo.com", "espn.com", "espn.com.br", "uol.com.br", "premierleague.com", "uefa.com", "conmebol.com", "fcbarcelona.com", "realmadrid.com", "liverpoolfc.com"}
-    def __init__(self, state):
-        self.state = state
-        self.state["news_context"] = {"configured": self.configured(), "articles": [], "facts": [], "error": None}
+    TRUSTED_DOMAINS = KNOWN_DOMAINS
+    AUTO_REFRESH_SECONDS = 1800
 
-    def configured(self):
-        return bool(os.getenv("NEWS_API_KEY", "").strip())
+    def __init__(self, state, broadcast=None, base=None):
+        self.state = state
+        self.broadcast = broadcast
+        self.base = Path(base or Path.cwd())
+        self.settings_path = self.base / 'news_context.json'
+        self.settings = {'auto_refresh': False, 'include_in_voice': False,
+                         'publishers': ['ge', 'espn', 'uol', 'official', 'other']}
+        self._load_settings()
+        self._match_key = None
+        self._last_auto = 0.0
+        self._fetch_lock = asyncio.Lock()
+        self._task = None
+        self.state['news_context'] = self._empty_status()
+
+    def _load_settings(self):
+        try:
+            data = json.loads(self.settings_path.read_text(encoding='utf-8'))
+            self.settings.update({key: data[key] for key in ('auto_refresh', 'include_in_voice', 'publishers') if key in data})
+            valid = [key for key in self.settings['publishers'] if key in PUBLISHERS]
+            self.settings['publishers'] = valid or list(PUBLISHERS)
+        except (OSError, ValueError, TypeError):
+            pass
+
+    def _empty_status(self):
+        return {'configured': True, 'provider': 'rss', **self.settings, 'articles': [], 'facts': [], 'error': None,
+                'updated_at': None, 'match_key': None}
 
     def status(self):
-        return self.state.get("news_context", {})
+        return self.state.get('news_context', self._empty_status())
 
     @staticmethod
     def clean(value, limit=500):
-        return re.sub(r"\s+", " ", str(value or "")).strip()[:limit]
+        return re.sub(r'\s+', ' ', str(value or '')).strip()[:limit]
 
     @classmethod
     def trust_label(cls, url):
-        host = urlparse(url).hostname or ""
-        host = host.removeprefix("www.")
-        return "alta" if any(host == domain or host.endswith("." + domain) for domain in cls.TRUSTED_DOMAINS) else "não verificada"
+        host = (urlparse(url).hostname or '').removeprefix('www.').casefold()
+        return 'alta' if any(host == domain or host.endswith('.' + domain) for domain in cls.TRUSTED_DOMAINS) else 'nÃ£o verificada'
 
-    async def fetch(self, days=3):
-        days = 7 if int(days) >= 7 else 3
-        key = os.getenv("NEWS_API_KEY", "").strip()
-        if not key:
-            self.state["news_context"] = {"configured": False, "articles": [], "facts": [], "error": "Configure NEWS_API_KEY no arquivo .env."}
-            return self.status()
-        names = [self.state.get(side, {}).get("name", "") for side in ("home", "away")]
-        names = [name for name in names if len(name) >= 3 and name not in {"Mandante", "Visitante"}]
-        if not names:
-            raise ValueError("Carregue uma partida antes de buscar notícias.")
-        query = " OR ".join(f'"{name}"' for name in names)
-        params = {"q": query, "from": (datetime.now(timezone.utc) - timedelta(days=days)).date().isoformat(), "sortBy": "publishedAt", "pageSize": 20, "language": "pt", "apiKey": key}
-        async with httpx.AsyncClient(timeout=20) as client:
-            response = await client.get("https://newsapi.org/v2/everything", params=params)
-            response.raise_for_status()
-            data = response.json()
-        articles = []
-        for item in data.get("articles", []):
-            title = self.clean(item.get("title"), 220)
-            url = self.clean(item.get("url"), 500)
-            source = self.clean((item.get("source") or {}).get("name"), 100)
-            published = self.clean(item.get("publishedAt"), 40)
-            if not title or not url or not source:
-                continue
-            trust = self.trust_label(url)
-            if any(existing["title"].casefold() == title.casefold() for existing in articles):
-                continue
-            articles.append({"title": title, "url": url, "source": source, "trust": trust, "published_at": published, "description": self.clean(item.get("description"), 300)})
-        facts = [{"id": "news:" + str(index), "text": f"Notícia recente: {item['title']} — fonte {item['source']}, publicada em {item['published_at'] or 'data não informada'}.", "source": {"name": item["source"], "url": item["url"]}} for index, item in enumerate(articles) if item["trust"] == "alta"]
-        self.state["news_context"] = {"configured": True, "days": days, "updated_at": datetime.now(timezone.utc).isoformat(), "articles": articles[:12], "facts": facts[:12], "error": None}
+    def _teams(self):
+        return [self.clean(self.state.get(side, {}).get('name'), 100) for side in ('home', 'away')]
+
+    def _player_names(self):
+        names = []
+        for side in ('home', 'away'):
+            players = self.state.get('lineups', {}).get(side, {})
+            for player in [*(players.get('starters') or []), *(players.get('bench') or [])]:
+                name = self.clean(player.get('name'), 80) if isinstance(player, dict) else ''
+                if name and name not in names:
+                    names.append(name)
+                if len(names) >= 10:
+                    return names
+        return names
+
+    def _current_match_key(self):
+        names = self._teams()
+        if any(len(name) < 3 or name in {'Mandante', 'Visitante'} for name in names):
+            return None
+        return '|'.join([self.clean(self.state.get('competition'), 100), *names])
+
+    def observe(self):
+        key = self._current_match_key()
+        if key != self._match_key:
+            self._match_key = key
+            self._last_auto = 0.0
+            self.state['news_context'] = {**self._empty_status(), 'match_key': key}
+        if (key and self.settings['auto_refresh'] and time.monotonic() - self._last_auto >= self.AUTO_REFRESH_SECONDS
+                and (self._task is None or self._task.done())):
+            self._last_auto = time.monotonic()
+            self._task = asyncio.create_task(self._fetch_automatic())
+
+    async def _fetch_automatic(self):
+        try:
+            await self.fetch(days=3, automatic=True)
+        except HTTPException as exc:
+            self.state['news_context'] = {**self.status(), 'error': str(exc.detail)}
+            if self.broadcast:
+                await self.broadcast()
+        except Exception:
+            self.state['news_context'] = {**self.status(), 'error': 'A atualização automática de notícias falhou; os dados do jogo continuam ativos.'}
+            if self.broadcast:
+                await self.broadcast()
+
+    def save_settings(self, payload: NewsSettingsRequest):
+        self.base.mkdir(parents=True, exist_ok=True)
+        publishers = list(dict.fromkeys(payload.publishers))
+        if not publishers:
+            raise HTTPException(400, 'Marque ao menos uma fonte de notícias.')
+        self.settings = {'auto_refresh': payload.auto_refresh, 'include_in_voice': payload.include_in_voice,
+                         'publishers': publishers}
+        try:
+            temporary = self.settings_path.with_suffix('.tmp')
+            temporary.write_text(json.dumps(self.settings, ensure_ascii=False, indent=2), encoding='utf-8')
+            temporary.replace(self.settings_path)
+        except OSError as exc:
+            raise HTTPException(500, 'Não foi possível salvar as preferências de notícias.') from exc
+        current = self.status()
+        articles = current.get('articles', [])
+        self.state['news_context'] = {**current, **self.settings, 'configured': True, 'provider': 'rss',
+                                      'facts': self._facts(articles) if payload.include_in_voice else [], 'error': None}
+        self.observe()
         return self.status()
 
+    def _domains(self):
+        return sorted({domain for publisher in self.settings['publishers'] for domain in PUBLISHERS[publisher][1]})
+
+    def _search_query(self, days):
+        terms = list(dict.fromkeys([*self._teams(), *self._player_names()]))
+        quoted = ' OR '.join(f'"{term}"' for term in terms)
+        sites = ' OR '.join(f'site:{domain}' for domain in self._domains())
+        period = 'when:3d' if days == 3 else 'when:7d'
+        return f'({quoted}) ({sites}) {period}'
+
+    @staticmethod
+    def _facts(articles):
+        return [{'id': 'news:' + hashlib.sha256(item['url'].encode('utf-8')).hexdigest()[:16],
+                 'text': f"Manchete publicada: {item['title']} — fonte {item['source']}, em {item['published_at'] or 'data não informada'}.",
+                 'source': {'name': item['source'], 'url': item['url']}}
+                for item in articles[:12]]
+
+    @staticmethod
+    def _rss_date(value):
+        try:
+            parsed = parsedate_to_datetime(value)
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=timezone.utc)
+            return parsed.astimezone(timezone.utc).isoformat()
+        except (TypeError, ValueError, OverflowError):
+            return ''
+
+    async def fetch(self, days=3, automatic=False):
+        async with self._fetch_lock:
+            days = 7 if int(days) >= 7 else 3
+            match_key = self._current_match_key()
+            if not match_key:
+                raise HTTPException(400, 'Carregue uma partida antes de buscar notícias.')
+            params = {'q': self._search_query(days), 'hl': 'pt-BR', 'gl': 'BR', 'ceid': 'BR:pt-419'}
+            try:
+                async with httpx.AsyncClient(timeout=20, follow_redirects=True, trust_env=False) as client:
+                    response = await client.get('https://news.google.com/rss/search', params=params,
+                                                headers={'User-Agent': 'FutebolLiveOverlay/1.0 RSS reader'})
+                response.raise_for_status()
+                root = ET.fromstring(response.content)
+            except (httpx.HTTPError, ET.ParseError, ValueError) as exc:
+                self.state['news_context'] = {**self.status(), 'error': 'Não foi possível consultar os feeds gratuitos. Confira sua conexão e tente novamente.'}
+                raise HTTPException(502, self.state['news_context']['error']) from exc
+
+            domains, articles, seen = self._domains(), [], set()
+            for item in root.findall('./channel/item'):
+                title = self.clean(item.findtext('title'), 220)
+                url = self.clean(item.findtext('link'), 800)
+                source_node = item.find('source')
+                source = self.clean(source_node.text if source_node is not None else '', 100)
+                source_url = self.clean(source_node.get('url') if source_node is not None else '', 800)
+                host = (urlparse(source_url).hostname or '').removeprefix('www.').casefold()
+                if not title or not source or not url.startswith('https://'):
+                    continue
+                if not source_url or not any(host == domain or host.endswith('.' + domain) for domain in domains):
+                    continue
+                normalized = title.casefold()
+                if normalized in seen:
+                    continue
+                seen.add(normalized)
+                articles.append({'title': title, 'url': url, 'source': source, 'publisher_url': source_url,
+                                 'trust': self.trust_label(source_url),
+                                 'published_at': self._rss_date(item.findtext('pubDate')),
+                                 'description': ''})
+            if match_key != self._current_match_key():
+                return self.status()
+            facts = self._facts(articles) if self.settings['include_in_voice'] else []
+            self._match_key = match_key
+            self.state['news_context'] = {'configured': True, 'provider': 'rss', **self.settings, 'days': days,
+                                          'updated_at': datetime.now(timezone.utc).isoformat(), 'match_key': match_key,
+                                          'articles': articles[:12], 'facts': facts, 'error': None,
+                                          'automatic': automatic, 'source_domains': domains,
+                                          'player_terms': self._player_names()}
+            if self.broadcast:
+                await self.broadcast()
+            return self.status()
+
+    async def start(self):
+        self.observe()
+
+    async def stop(self):
+        if self._task and not self._task.done():
+            self._task.cancel()
+            try:
+                await self._task
+            except asyncio.CancelledError:
+                pass
+
     def install(self, app):
-        @app.get("/api/context/news")
+        @app.get('/api/context/news')
         async def news(days: int = 3):
             return await self.fetch(days)
 
-        @app.get("/api/context/status")
+        @app.get('/api/context/status')
         async def status():
-            return self.status()
+            return {**self.status(), 'publishers_available': {key: label for key, (label, _) in PUBLISHERS.items()}}
+
+        @app.post('/api/context/settings')
+        async def settings(payload: NewsSettingsRequest):
+            result = self.save_settings(payload)
+            if self.broadcast:
+                await self.broadcast()
+            return result
+
+        app.add_event_handler('startup', self.start)
+        app.add_event_handler('shutdown', self.stop)
