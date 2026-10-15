@@ -28,6 +28,10 @@ class ContextFeatureTests(unittest.TestCase):
         with patch.dict(os.environ, {}, clear=True):
             self.assertFalse(context.configured())
 
+    def test_news_trust_uses_official_or_recognized_domains(self):
+        self.assertEqual(NewsContext.trust_label("https://ge.globo.com/futebol/noticia"), "alta")
+        self.assertEqual(NewsContext.trust_label("https://example.invalid/story"), "não verificada")
+
 
 if __name__ == "__main__":
     unittest.main()
