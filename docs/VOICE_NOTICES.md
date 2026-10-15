@@ -1,15 +1,8 @@
 # Componentes da voz local
 
-## Planejamento local dos comentários
+## Planejamento dos comentários
 
-**Qwen3-4B-GGUF**, quantização Q4_K_M, é distribuído pelo projeto Qwen sob Apache-2.0. A execução usa **llama.cpp**, licença MIT, build `b10410` com Vulkan. O modelo seleciona uma abertura e índices de informações fornecidas; o programa valida esses índices e monta o texto com os fatos originais. Não há serviço externo de geração de texto, nem cobrança por comentário.
-
-- Modelo: https://huggingface.co/Qwen/Qwen3-4B-GGUF
-- Revisão fixada: `bc640142c66e1fdd12af0bd68f40445458f3869b`.
-- SHA-256 do GGUF: `7485fe6f11af29433bc51cab58009521f205840f5b4ae3a32fa7f92e8534fdf5`.
-- Runtime: https://github.com/ggml-org/llama.cpp/releases/tag/b10410
-- SHA-256 do pacote Windows Vulkan: `943f047c39843a8051a750424957852079f740bfeb6a9fa4b155d720b52d576e`.
-- As fontes de informações cadastrais e históricas são identificadas separadamente no painel; a licença do modelo não substitui as condições dessas fontes.
+O planejador pode ser desligado, conectado a um servidor local compatível com OpenAI Chat Completions, ou a uma API online HTTPS. O usuário escolhe o serviço, modelo e URL no painel. Quando configurado, o serviço recebe as informações usadas no comentário; podem se aplicar termos, cobrança e condições de privacidade do provedor. A resposta só pode escolher uma abertura permitida e índices de fatos enviados pelo programa; nomes, números e fatos originais são montados e validados localmente. Sem resposta válida, o programa mantém o texto factual original.
 
 ## Kokoro
 
@@ -37,6 +30,6 @@ O modo de IA usa **Piper TTS 1.8.0**, da Open Home Foundation, instalado separad
 - O cartão dessa voz declara CC0 para o conjunto de treinamento. O repositório de vozes informa MIT em seus metadados. As declarações originais ficam em `models/piper/MODEL_CARD` e `models/piper/REPOSITORY_README.md` após instalar.
 - SHA-256 do modelo ONNX: `858555e3a064209c57088fe6bd70c4c3dc54d03eaa00c45d5ecaf43a33f95aa7`.
 
-A geração de voz acontece localmente. Textos de narração seguem do navegador para o servidor local do programa; não são enviados a uma API externa de voz. A primeira instalação baixa o motor, suas dependências e o modelo. As consultas de dados do futebol continuam usando a internet.
+A geração de voz acontece localmente. Textos de narração seguem do navegador para o servidor local do programa; não são enviados à API de planejamento de texto. A primeira instalação baixa o motor de voz, suas dependências e o modelo. As consultas de dados do futebol continuam usando a internet.
 
-O Qwen3 local pode selecionar e ordenar informações dos comentários. A saída é um plano restrito aos fatos fornecidos; o texto factual permanece inalterado. A síntese da voz é feita por Kokoro ou Piper. As licenças desses componentes não concedem direitos sobre transmissões, dados esportivos ou escudos de terceiros. Ao redistribuir o software, mantenha e observe as licenças dos componentes incluídos.
+O planejador configurado pode selecionar e ordenar informações dos comentários. A saída é um plano restrito aos fatos fornecidos; o texto factual permanece inalterado. A síntese da voz é feita por Kokoro ou Piper. As licenças desses componentes não concedem direitos sobre transmissões, dados esportivos ou escudos de terceiros. Ao redistribuir o software, mantenha e observe as licenças dos componentes incluídos.

@@ -162,7 +162,12 @@ $('replayTactical').onclick=narrationAction(()=>narrationSession.commandAction('
 $('readLineups').onclick=narrationAction(()=>narrationSession.commandAction('lineups'));
 $('skipLineups').onclick=narrationAction(()=>narrationSession.commandAction('skip_lineups'));
 $('useDynamicVoice').onclick=narrationAction(()=>narrationSession.save({voice:'kokoro:pm_alex',commentaryVoice:'kokoro:pf_dora',delivery:'dynamic',rate:1}));
-$('prepareBrain').onclick=narrationAction(async()=>{await brainOutput.prepare();showBrainStatus();});
+$('saveBrainSettings').onclick=narrationAction(async()=>{
+ await brainOutput.saveSettings({connection:$('brainConnection').value,base_url:$('brainBaseUrl').value.trim(),model:$('brainModel').value.trim(),api_key:$('brainApiKey').value||null,clear_api_key:$('brainClearKey').checked});
+ fillBrainSettings();showBrainStatus();notice('Configuração da IA salva. Agora teste a conexão.');
+});
+$('brainConnection').onchange=()=>{$('brainBaseUrl').placeholder=$('brainConnection').value==='local'?'http://127.0.0.1:1234/v1':'https://provedor.com/v1';};
+$('prepareBrain').onclick=narrationAction(async()=>{try{await brainOutput.prepare();}finally{showBrainStatus();}});
 $('saveCommentLibrary').onclick=narrationAction(async()=>{
  const team=$('commentLibraryTeam').value.trim();
  const player=$('commentLibraryPlayer').value.trim();
@@ -197,7 +202,20 @@ $('saveSponsorReads').onclick=narrationAction(async()=>{
  renderSavedTextList('savedSponsorReads', items, 'anúncios');
  notice('Anúncios salvos.');
 });
-function showBrainStatus(){$('brainStatus').textContent=brainOutput.message;$('prepareBrain').disabled=!brainOutput.status?.installed||brainOutput.status?.ready;}
+function fillBrainSettings(){
+ const settings=brainOutput.status||{};
+ if(document.activeElement!==$('brainConnection'))$('brainConnection').value=settings.connection||'local';
+ if(document.activeElement!==$('brainBaseUrl'))$('brainBaseUrl').value=settings.base_url||'';
+ if(document.activeElement!==$('brainModel'))$('brainModel').value=settings.model||'';
+ $('brainApiKey').value='';
+ $('brainApiKey').placeholder=settings.has_api_key?'Chave salva; deixe vazio para manter':'Necessária para alguns provedores online';
+ $('brainClearKey').checked=false;
+ $('prepareBrain').textContent=settings.ready?'Conexão ativa':'Testar conexão';
+}
+function showBrainStatus(){
+ $('brainStatus').textContent=brainOutput.message;
+ $('prepareBrain').disabled=!brainOutput.status?.configured||brainOutput.status?.ready||brainOutput.status?.loading;
+}
 function populatePlayerFocus(state){
  const select=$('narrationPlayerFocus');
  const players=[];
@@ -220,7 +238,7 @@ function populatePlayerFocus(state){
  const current=selected&&players.some(p=>p.value===selected)?selected:'';
  if(!current&&select.value)select.value='';
 }
-$('refreshNarrationVoices').onclick=narrationAction(async()=>{await Promise.all([speechOutput.load(),brainOutput.load()]);loadNarrationVoices();showBrainStatus();});
+$('refreshNarrationVoices').onclick=narrationAction(async()=>{await Promise.all([speechOutput.load(),brainOutput.load()]);loadNarrationVoices();fillBrainSettings();showBrainStatus();});
 window.speechSynthesis?.addEventListener('voiceschanged',loadNarrationVoices);
 $('obsAudioUrl').textContent=location.origin+'/audio';
 $('copyAudioUrl').onclick=narrationAction(async()=>{await navigator.clipboard.writeText(location.origin+'/audio');notice('Endereço de áudio copiado.');});
@@ -237,4 +255,4 @@ function updateNarrationState(state){
 }
 $('narrationPlayerFocus').onchange=narrationAction(()=>{saveNarrationPreferences();});
 function refreshClubContext(){narrationSession.refreshContext();}
-narrationSession.load().then(()=>{loadNarrationVoices();showBrainStatus();}).catch(e=>notice(e.message,true));
+narrationSession.load().then(()=>{loadNarrationVoices();fillBrainSettings();showBrainStatus();}).catch(e=>notice(e.message,true));

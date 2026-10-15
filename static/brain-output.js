@@ -1,17 +1,24 @@
-// Optional local planning. A canceled or slow plan cannot hold up the match narration.
+// Optional API-backed planning. A canceled or slow plan cannot hold up the match narration.
 class BrainOutput {
- constructor(){this.enabled=true;this.status=null;this.message='Verificando a IA local…';}
+ constructor(){this.enabled=true;this.status=null;this.message='Verificando a configuração da IA…';}
  async load(){
   try{
    const response=await fetch('/api/brain/status');
    if(!response.ok)throw new Error();
    this.status=await response.json();this.message=this.status.message;
-  }catch{this.status=null;this.message='Reinicie o programa pelo start.bat para carregar o cérebro local.';}
+  }catch{this.status=null;this.message='Não foi possível carregar a configuração da IA. Reinicie o programa.';}
+ }
+ async saveSettings(settings){
+  const response=await fetch('/api/brain/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(settings)});
+  const body=await response.json().catch(()=>({}));
+  if(!response.ok)throw new Error(body.detail||'Não foi possível salvar a configuração da IA.');
+  this.status=body;this.message=body.message;
+  return body;
  }
  async prepare(){
-  const response=await fetch('/api/brain/start',{method:'POST'});
+  const response=await fetch('/api/brain/test',{method:'POST'});
   const body=await response.json().catch(()=>({}));
-  if(!response.ok)throw new Error(body.detail||'Não foi possível preparar a IA. Reinicie o programa pelo start.bat.');
+  if(!response.ok){this.message=body.detail||'Não foi possível conectar à IA.';if(this.status)this.status={...this.status,ready:false,message:this.message};throw new Error(this.message);}
   this.status=body;this.message=body.message;
  }
  async compose(item,state,signal){

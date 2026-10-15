@@ -4,6 +4,7 @@ __pycache__/
 *.pyc
 models/
 narration.json
+brain.json
 artifacts/
 player_photos.json
 coach_overrides.json

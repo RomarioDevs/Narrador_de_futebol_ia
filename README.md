@@ -21,14 +21,14 @@ A leitura GE exige o Microsoft Edge instalado. O programa abre uma instância in
 | Pasta / arquivo | Conteúdo |
 | --- | --- |
 | `start.bat` | Iniciar o programa. |
-| `install_voice.bat`, `install_brain.bat` | Instalar ou restaurar as IAs. |
+| `install_voice.bat` | Instalar ou restaurar as vozes locais. |
 | `main.py`, `launcher.py` | Entrada do servidor e inicialização. |
 | `backend/` | Fontes de dados, narração, vozes, aparência e contexto. |
 | `static/` | Painel, overlay e página de áudio. |
 | `tools/` | Instaladores Python e diagnóstico manual do GE. |
 | `tests/` | Testes automatizados. |
 | `docs/` | Guias, estudos, licenças e roteiro original. |
-| `models/` | Modelos de voz e linguagem instalados. |
+| `models/` | Modelos de voz; arquivos locais de LLM existentes não são executados pelo programa. |
 | `artifacts/` | Capturas e resultados de diagnóstico. |
 
 Configurações locais: `.env` (chaves), `appearance.json` (visual) e `narration.json` (vozes, saída, opções e ativação). Para executar os testes, use `.venv/Scripts/python.exe -m unittest discover -s tests -q` na pasta principal.
@@ -64,7 +64,7 @@ Na aba **04 · Manual**, use **Enviar lance para a transmissão** para informar 
 
 O leitor oficial do Live Chat pode ser ativado com `YOUTUBE_API_KEY` e `YOUTUBE_LIVE_CHAT_ID` no `.env`. Ele reconhece `!placar`, `!jogador`, `!pergunta`, `!narrar` e `!escalação`, limita respostas repetidas por usuário e nunca altera o placar. O chat fica atrás de gols, cartões e VAR na fila de narração. A chave e o `liveChatId` devem ser obtidos no Google Cloud/YouTube; não coloque esses valores no Git.
 
-No endereço `http://127.0.0.1:8787/control`, a aba **06 · Live** salva `YOUTUBE_API_KEY` e `YOUTUBE_LIVE_CHAT_ID` por partida, no arquivo local `youtube_live.json`, e mostra os três jogadores mais mencionados. A aba **07 · Notícias** busca notícias dos últimos 3 dias ou da semana quando `NEWS_API_KEY` está configurada. A aba **08 · Notas** concentra repertório, comentários rápidos e patrocínios. A IA local (`Qwen3 · cérebro local`, usando o runtime llama instalado) recebe os fatos como opções e escolhe os dados para um comentário mais dinâmico, sem inventar números, lesões, resultados ou lances.
+No endereço `http://127.0.0.1:8787/control`, a aba **06 · Live** salva `YOUTUBE_API_KEY` e `YOUTUBE_LIVE_CHAT_ID` por partida, no arquivo local `youtube_live.json`, e mostra os três jogadores mais mencionados. A aba **07 · Notícias** busca notícias dos últimos 3 dias ou da semana quando `NEWS_API_KEY` está configurada. A aba **08 · Notas** concentra repertório, comentários rápidos e patrocínios. A IA de comentários pode usar um servidor local ou uma API online compatível com OpenAI Chat Completions; ela recebe fatos como opções e escolhe os dados para um comentário mais dinâmico, sem inventar números, lesões, resultados ou lances.
 
 ## Formação, fotos e informações dos jogadores
 
@@ -107,7 +107,7 @@ Para instalar ou restaurar a IA, execute **install_voice.bat** na pasta do progr
 
 Clique em **Alex narra + Dora comenta** para selecionar duas vozes no estilo Rádio. Os seletores **Voz do narrador** e **Voz do comentarista** permitem escolher timbres separados para lances e análises; os botões de teste reproduzem cada papel individualmente. Em **Interpretação**, escolha **Dinâmica** para acelerar discretamente os gols, alternar suas chamadas e dar mais pausa aos comentários estatísticos. **Regular** mantém o ritmo selecionado. O Kokoro também ajusta as pausas entre frases; a entonação final depende do modelo. **Testar voz**, no modo dinâmico, reproduz um comentário de teste e um exemplo de gol, identificados como demonstração. Compare Alex, Santa e Dora e escolha o timbre de sua preferência. O modo não simula emoção humana nem transforma estatísticas em jogadas não informadas.
 
-O Qwen3 local seleciona informações recebidas e organiza comentários curtos. O resultado é validado contra as informações fornecidas: nomes, números e texto factual são preservados. Kokoro e Piper geram o áudio. Os lances seguem diretamente para a voz para não esperar o planejador. Sem IA disponível ou com resposta inválida, o texto factual original continua funcionando.
+O planejador configurado no painel seleciona informações recebidas e organiza comentários curtos. Em **Tipo de IA**, escolha um servidor local compatível (por exemplo LM Studio ou Ollama) ou uma API online HTTPS; informe URL base, nome exato do modelo e, quando necessário, uma chave. A chave fica no `.env` local e não é devolvida ao navegador. O resultado é validado contra as informações fornecidas: nomes, números e texto factual são preservados. Kokoro e Piper geram o áudio. Os lances seguem diretamente para a voz para não esperar o planejador. Sem conexão com a IA ou com resposta inválida, o texto factual original continua funcionando. APIs online recebem os fatos enviados para o comentário e podem cobrar por uso.
 
 A narração anuncia novos lances e mudanças de placar recebidos após a ativação, sem reler os lances antigos a cada consulta. Ao trocar a partida, descarta a fila anterior. O botão **Parar** interrompe a voz. As configurações ficam salvas no servidor em `narration.json`. Na saída **Neste painel**, fechar a página interrompe o áudio; na saída **Diretamente no OBS**, o áudio continua na fonte `/audio`.
 
@@ -126,9 +126,9 @@ Copie `.env.example` para `.env` e preencha:
 
 O programa consulta a partida configurada e sincroniza placar, minuto e estatísticas disponíveis.
 
-## Cérebro local, duas vozes e informações dos clubes
+## IA de comentários, duas vozes e informações dos clubes
 
-Execute `install_brain.bat` para instalar **Qwen3-4B Q4_K_M** (aproximadamente 2,5 GB) e llama.cpp para Windows. O instalador verifica os arquivos por SHA-256 e evita instalações simultâneas. Depois de instalado, o processamento de texto funciona sem internet; os dados esportivos continuam dependendo das fontes. O modelo usa um processo local, carregado ao clicar em **Preparar IA** ou ao iniciar a narração com essa opção habilitada, e é encerrado junto do servidor.
+Na aba **Partida**, configure **Tipo de IA**, **URL base da API** e **Nome exato do modelo**; informe uma chave apenas quando o provedor pedir. Para LM Studio/Ollama local, inicie o servidor do aplicativo local e use a URL e o identificador de modelo exibidos por ele. Para um serviço online, selecione **API online · HTTPS**. Clique em **Salvar configuração da IA** e depois em **Testar conexão**. A opção **Usar IA para organizar os comentários** controla se o planejador entra na narração. Sem configuração ou sem resposta válida, o programa mantém os comentários factuais. O app não instala nem executa um motor de LLM local; o servidor local escolhido precisa estar instalado e autorizado no Windows. As configurações ficam em `brain.json`; a chave fica no `.env` local.
 
 Na cabine, clique em **Alex narra + Dora comenta** para configurar as vozes. É possível trocar cada uma nos seletores e usar **Testar narrador** / **Testar comentarista**. Uma única fila alterna as falas; gols e eventos novos interrompem análises. A reserva de áudio permite apenas uma página narrando por vez. A síntese usa memória: o programa não grava os áudios em arquivos; os buffers são liberados ao terminar/cancelar cada fala, e a fila é limpa depois do anúncio final.
 

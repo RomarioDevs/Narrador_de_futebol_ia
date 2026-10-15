@@ -4,7 +4,7 @@ Avaliação em 15/09/2026. O roteiro com várias fontes, duas vozes alternadas e
 
 | Proposta | Situação |
 | --- | --- |
-| IA instalada no computador | Qwen3-4B com llama.cpp; seleciona informações e organiza comentários sem alterar os fatos. |
+| IA de comentários | Configurável no painel: servidor local ou API OpenAI-compatible; seleciona informações e organiza comentários sem alterar os fatos. Sem conexão, mantém o comentário factual original. |
 | Narrador e comentarista | Seletores separados; uma única fila de reprodução. |
 | Prioridade para gols, cartões e mudanças no placar | Lances interrompem análises. Gols não aguardam o planejador de texto. |
 | Titulares e posições | Leitura por equipe ao chegar a escalação completa; botão para solicitar novamente. |
@@ -37,6 +37,5 @@ Manter uma fonte principal para placar e relógio, validar identidade e horário
 - [API-Football — guia e limites de acesso](https://www.api-football.com/news/post/how-to-get-started-with-api-football-the-complete-beginners-guide)
 - [API-Football — termos e limites](https://www.api-football.com/terms)
 - [TheSportsDB — API gratuita](https://www.thesportsdb.com/api.php)
-- [Qwen3 — modelo local](https://huggingface.co/Qwen/Qwen3-4B-GGUF)
 - [Liverpool FC — história da Kop](https://www.liverpoolfc.com/news/125-years-story-spion-kop)
 - [Fulham FC — história do clube](https://www.fulhamfc.com/club/history/history-of-fulham-football-club)
