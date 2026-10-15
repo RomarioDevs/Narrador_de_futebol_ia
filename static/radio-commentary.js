@@ -34,6 +34,14 @@ class RadioCommentary {
   if(accuracy)add('accuracy',accuracy,`Precisão de passe: ${home}, ${this.number(accuracy[0])} por cento. ${away}, ${this.number(accuracy[1])} por cento.`);
   const top=(s.youtube_chat?.top_players||[]).filter(item=>item?.name&&Number(item.count)>0).slice(0,3);
   if(top.length)add('chat-top',top.map(item=>[item.name,item.count]),`No chat da transmissão, os nomes mais comentados são ${top.map(item=>`${item.name}, com ${item.count} menções`).join('; ')}.`);
+  const players=[...['home','away'].flatMap(side=>[...(s.lineups?.[side]?.starters||[]),...(s.lineups?.[side]?.bench||[])])];
+  players.filter(player=>player?.name&&player.match_stats&&Object.keys(player.match_stats).length).slice(0,3).forEach(player=>{
+   const stats=player.match_stats, parts=[];
+   if(stats.totalGoals!=null)parts.push(`${stats.totalGoals} gol(s)`);
+   if(stats.goalAssists!=null)parts.push(`${stats.goalAssists} assistência(s)`);
+   if(stats.shots!=null)parts.push(`${stats.shots} finalização(ões)`);
+   if(parts.length)add('player:'+player.id,parts,`${player.name} aparece nas estatísticas da partida com ${parts.join(', ')}.`);
+  });
   for(const fact of (s.news_context?.facts||[]).slice(0,3))if(fact?.text)add('news:'+fact.id,[fact.id],fact.text);
   return result;
  }
