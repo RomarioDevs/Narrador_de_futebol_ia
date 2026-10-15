@@ -155,7 +155,7 @@ $('testCommentaryVoice').onclick=narrationAction(()=>narrationSession.preview(tr
 $('startNarration').onclick=narrationAction(async()=>{if(narrationSession.settings.output==='control')await narrationSession.unlock(matchNarrator.voice);await narrationSession.save({enabled:true,paused:false});});
 $('stopNarration').onclick=narrationAction(async()=>{matchNarrator.stop();await narrationSession.save({enabled:false,paused:false});});
 $('hostCommentary').onclick=narrationAction(()=>narrationSession.save({paused:!narrationSession.settings.paused}));
-$('narrationPanorama').onclick=narrationAction(()=>narrationSession.commandAction('panorama'));
+$('narrationPanorama').onclick=narrationAction(async()=>{if(narrationSession.settings.output==='control')await narrationSession.unlock(matchNarrator.commentaryVoice);await narrationSession.commandAction('panorama');});
 $('replayShort').onclick=narrationAction(()=>narrationSession.commandAction('replay_short'));
 $('replayDetail').onclick=narrationAction(()=>narrationSession.commandAction('replay_detail'));
 $('replayTactical').onclick=narrationAction(()=>narrationSession.commandAction('replay_tactical'));
