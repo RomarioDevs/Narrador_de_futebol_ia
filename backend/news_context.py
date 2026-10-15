@@ -181,8 +181,11 @@ class NewsContext:
 
     @staticmethod
     def _facts(articles):
+        def spoken_title(item):
+            title = item['title']
+            return re.sub(r'^\s*(?:GE|UOL|ESPN|Lance|Terra|Band)\s*[:|·–—-]\s*', '', title, flags=re.IGNORECASE)
         return [{'id': 'news:' + hashlib.sha256(item['url'].encode('utf-8')).hexdigest()[:16],
-                 'text': f"Manchete publicada: {item['title']} — fonte {item['source']}, em {item['published_at'] or 'data não informada'}.",
+                 'text': f"Notícia recente: {spoken_title(item)} — publicada em {item['published_at'] or 'data não informada'}.",
                  'source': {'name': item['source'], 'url': item['url']}}
                 for item in articles]
 
@@ -300,12 +303,12 @@ class NewsContext:
                 raise HTTPException(503, 'A integração com a LLM não está disponível neste servidor.')
             facts = self._facts(articles)
             script_articles = [{**article, 'id': fact['id']} for article, fact in zip(articles, facts)]
-            context = {'times': self._teams(), 'competição': self.clean(self.state.get('competition'), 100),
-                       'temporada': self._season_year(), 'placar_atual': self.state.get('home', {}).get('score'),
-                       'fase': self.clean(self.state.get('phase'), 30)}
+            # RSS supplies headlines and metadata only; match data is not news evidence.
+            context = {'teams': self._teams(), 'competition': self.clean(self.state.get('competition'), 100),
+                       'season': self._season_year()}
             segments = await self.brain.news_script(script_articles, context)
             if match_key != self._current_match_key():
-                raise HTTPException(409, 'A partida mudou durante a gera????o. Pesquise as not??cias novamente.')
+                raise HTTPException(409, 'A partida mudou durante a geracao. Pesquise as noticias novamente.')
             script_id = hashlib.sha256((match_key + str(current.get('updated_at')) +
                                          ''.join(item.get('id', '') for item in script_articles)).encode('utf-8')).hexdigest()[:24]
             return {'script_id': script_id, 'match_key': match_key, 'segments': segments,

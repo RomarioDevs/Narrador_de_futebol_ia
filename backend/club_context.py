@@ -44,7 +44,7 @@ def stadium_facts(row):
     if not name or not year.isdigit() or not 1700 <= int(year) <= datetime.now(timezone.utc).year:
         return []
     return [{'id': 'venue:' + str(row['idVenue']),
-             'text': f'História dos estádios: {name} tem {year} como ano de fundação informado no cadastro do TheSportsDB.',
+             'text': f'História dos estádios: {name} tem {year} como ano de fundação.',
              'source': {'name': 'TheSportsDB', 'url': 'https://www.thesportsdb.com/venue/' + str(row['idVenue'])}}]
 
 
@@ -142,7 +142,7 @@ def player_facts(rows, lineup, side, source, team_id):
         coach = managers[0]
         # Explicitly a catalogue claim; it is not treated as the match's confirmed starting lineup.
         result.append({'id': 'coach:' + coach['idPlayer'],
-                       'text': f"Na comissão técnica cadastrada de {display_name(coach.get('strTeam', ''))}, o TheSportsDB informa {coach['strPlayer']} como treinador.",
+                       'text': f"Na comissão técnica cadastrada de {display_name(coach.get('strTeam', ''))}, {coach['strPlayer']} aparece como treinador.",
                        'side': side,
                        'coach': normalize_coach({'name': coach['strPlayer'], 'photo': coach.get('strCutout') or coach.get('strThumb')}, 'TheSportsDB'),
                        'source': {'name': 'TheSportsDB', 'url': 'https://www.thesportsdb.com/player/' + coach['idPlayer']}})
@@ -173,7 +173,7 @@ def facts_for(row, name):
                                ('nickname', 'strKeywords', 'o apelido registrado do clube')]:
         value = row.get(field)
         if isinstance(value, str) and 1 <= len(value.strip()) <= 100 and not re.search(r'[<>\r\n]', value):
-            add(key, f'Sobre o {name}: {phrase} é {value.strip()}, segundo o TheSportsDB.')
+            add(key, f'Sobre o {name}: {phrase} é {value.strip()}.')
     return result
 
 

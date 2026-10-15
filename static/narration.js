@@ -451,7 +451,7 @@ class MatchNarrator {
   if(!event.text||event.text==='Lance registrado na partida')return '';
   const minute=String(event.minute??'').replace(/['′\s]/g,'').match(/^(\d+)(?:\+(\d+))?$/);
   const when=minute?`Aos ${minute[1]} minutos${minute[2]?`, mais ${minute[2]} de acréscimo`:''}. `:'';
-  let text=event.text.replace(/\s*·\s*/g,'. ');
+  let text=event.text.replace(/^\s*(?:GE|UOL|ESPN|TheSportsDB)\s*(?::|\u00b7|[-\u2013\u2014])\s*/i,'').replace(/\s*\u00b7\s*/g,'. ');
   if(event.editorial)return (event.corrected?'Atualização do lance. ':'')+when+(event.period?event.period.replace('1T','Primeiro tempo. ').replace('2T','Segundo tempo. '):'')+text;
   if(this.style==='radio'||this.delivery==='dynamic'){
    if(this.eventKind(event)==='goal')text=text.replace(/^Gol(?:\s+contra|\s+de cabeça)?\.?\s*/i,match=>/contra/i.test(match)?'Gol contra! ':/cabeça/i.test(match)?'Gol de cabeça! ':this.delivery==='dynamic'?['É gol! ','Bola na rede! ','Saiu o gol! '][(this.goalCount||0)%3]:'É gol! ');
@@ -559,7 +559,7 @@ class MatchNarrator {
    if(ended){this.lineupQueue=[];this.finishAfterDrain=true;if(this.stageScripts)this.readStage(s);else this.enqueue('Partida encerrada.'+(validScore?' Placar final. '+this.scoreboard(s):''));}
    else if(validScore&&(scoreChanged||goal)) {
     // Manual goals can arrive in two consecutive WebSocket messages: score, then event.
-    this.scoreTimer=setTimeout(()=>{this.scoreTimer=null;if(this.enabled)this.enqueue((scoreReduced?'Correção do placar informada pela fonte. ':'Placar atualizado. ')+this.scoreboard(s),'event',{scoreAnnouncement:true,urgent:scoreReduced});},1000);
+    this.scoreTimer=setTimeout(()=>{this.scoreTimer=null;if(this.enabled)this.enqueue((scoreReduced?'Correção do placar. ':'Placar atualizado. ')+this.scoreboard(s),'event',{scoreAnnouncement:true,urgent:scoreReduced});},1000);
    }
   }
   if(s.status==='INTERVALO'&&this.lastStatus!=='INTERVALO'){if(this.stageScripts)this.readStage(s);else if(!fresh.some(e=>/intervalo/i.test(e.text||'')))this.enqueue('Intervalo da partida. '+this.scoreboard(s));}

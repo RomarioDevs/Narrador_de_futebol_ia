@@ -38,7 +38,7 @@ class RadioCommentary {
     const counts={V:0,E:0,D:0};rows.forEach(row=>counts[row.result]++);
     const latest=rows[0];
     const recent=latest?.opponent?` O resultado mais recente foi ${latest.result} contra ${latest.opponent}${latest.score?`, por ${latest.score}`:''}${latest.competition?`, em ${latest.competition}`:''}.`:'';
-    add(`form:${side}`,rows.map(row=>[row.result,row.opponent,row.score,row.date]),`Nos últimos ${rows.length} resultados informados para ${s[side].name}: ${counts.V} vitórias, ${counts.E} empates e ${counts.D} derrotas.${recent}`,{name:s.data_sources?.recent_form||s.source||'ESPN'});
+    add(`form:${side}`,rows.map(row=>[row.result,row.opponent,row.score,row.date]),`Nos últimos ${rows.length} resultados para ${s[side].name}: ${counts.V} vitórias, ${counts.E} empates e ${counts.D} derrotas.${recent}`,{name:s.data_sources?.recent_form||s.source||'ESPN'});
    }
   }
   const top=(s.youtube_chat?.top_players||[]).filter(item=>item?.name&&Number(item.count)>0).slice(0,3);
@@ -76,7 +76,7 @@ class RadioCommentary {
     const r=s.standings?.[side];
     return r?.rank&&r.points!=null?`${s[side].name}: posição ${r.rank}, com ${r.points} pontos.`:'';
    }).filter(Boolean).join(' ');
-   return `${intro} Pré-jogo.${ranks?' Na classificação informada pela fonte: '+ranks:''}`;
+   return `${intro} Pré-jogo.${ranks?' Na classificação: '+ranks:''}`;
   }
   const moment=s.phase==='post'?'Partida encerrada.':s.status==='INTERVALO'?'Intervalo.':s.source==='manual'?'Dados do controle manual.':this.clock(s)?`Na última atualização, ${this.clock(s)}.`:'Na última informação recebida.';
   const numbers=this.candidates(s).slice(0,2).map(c=>c.text).join(' ');
