@@ -6,4 +6,5 @@ models/
 narration.json
 artifacts/
 player_photos.json
+coach_overrides.json
 static/uploads/

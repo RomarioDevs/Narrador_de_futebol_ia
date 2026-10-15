@@ -16,10 +16,11 @@ class MatchAnimation {
   this.score=total;
   for(const e of [...events].reverse()){
    const id=this.eventKey(e),kind=MatchEvents.kind(e);
-   if(this.active?.id===id&&!['goal','substitution'].includes(kind))this.reset();
+   if(this.active?.id===id&&!['goal','substitution','card'].includes(kind))this.reset();
    if(this.seen.has(id))continue;
    this.seen.add(id);
-   if(!visible||s.phase!=='in'||!['goal','substitution'].includes(kind))continue;
+   if(!visible||s.phase!=='in'||!['goal','substitution','card'].includes(kind))continue;
+   if(kind==='card'&&!/amarel|vermelh|yellow|red card|expuls/i.test(e.text||'')&&!['🟨','🟥'].includes(e.icon)&&!['red','yellow'].includes(e.card_color))continue;
    const nums=String(e.minute||'').match(/\d+/g),minute=nums?nums.map(Number).reduce((a,b)=>a+b,0):null;
    if(minute!==null&&Number(s.minute)-minute>3)continue;
    this.queue.push({id,kind,event:e});
@@ -45,10 +46,14 @@ class MatchAnimation {
   const out=find(e.player_out)||(outs.length===1?outs[0]:null),incoming=find(e.player_in)||(ins.length===1?ins[0]:null);
   const geDescription=item.kind==='goal'&&scorer&&s.ge?.ready?(s.ge.events||[]).find(g=>g.kind==='goal'&&norm(g.player)===norm(scorer.name)&&String(g.minute)===String(e.minute)):null;
   const description=geDescription?.text||e.text||'';
-  const el=document.createElement('section');el.id='matchAnimation';el.className='match-moment '+item.kind;el.setAttribute('aria-live','polite');
-  el.innerHTML=`<div class="moment-shine"></div><div class="moment-content"><div class="moment-top">${esc(side?s[side].name:s.competition)} · ${esc(e.minute||'—')}′</div><h2>${item.kind==='goal'?'GOOOL!':'SUBSTITUIÇÃO'}</h2><div class="moment-people">${item.kind==='goal'?this.portrait(scorer||(e.player?{name:e.player}:null),'AUTOR DO GOL'):this.portrait(out,'SAI','out')+'<span class="moment-swap">⇄</span>'+this.portrait(incoming,'ENTRA','in')}</div><p class="moment-description">${esc(description)}</p><small class="moment-source">${geDescription?'GE · tempo real':esc(e.source?.name||s.source||'')}</small></div><div class="moment-progress" style="--duration:${item.kind==='goal'?9:7}s"></div>`;
+  const red=item.kind==='card'&&(e.icon==='🟥'||e.card_color==='red'||/vermelho|expuls|red card/i.test(e.text||''));
+  const duration=item.kind==='goal'?15000:item.kind==='substitution'?12000:10000;
+  const title=item.kind==='goal'?'GOOOL!':item.kind==='card'?(red?'CARTÃO VERMELHO':'CARTÃO AMARELO'):'SUBSTITUIÇÃO';
+  const persons=item.kind==='substitution'?this.portrait(out,'SAI','out')+'<span class="moment-swap">⇄</span>'+this.portrait(incoming,'ENTRA','in'):this.portrait(scorer||(e.player?{name:e.player}:null),item.kind==='goal'?'AUTOR DO GOL':red?'EXPULSO':'ADVERTIDO');
+  const el=document.createElement('section');el.id='matchAnimation';el.className='match-moment '+item.kind+(item.kind==='card'?(red?' red-card':' yellow-card'):'');el.setAttribute('aria-live','polite');
+  el.innerHTML=`<div class="moment-shine"></div><div class="moment-content"><div class="moment-top">${esc(side?s[side].name:s.competition)} · ${esc(e.minute||'—')}′</div><h2>${title}</h2>${item.kind==='card'?'<div class="moment-card-symbol" aria-hidden="true"></div>':''}<div class="moment-people">${persons}</div>${item.kind==='substitution'?'':`<p class="moment-description">${esc(description)}</p>`}</div><div class="moment-progress" style="--duration:${duration/1000}s"></div>`;
   document.getElementById('matchLineups')?.appendChild(el);
-  this.timer=setTimeout(()=>{el.remove();this.active=null;this.next()},item.kind==='goal'?9000:7000);
+  this.timer=setTimeout(()=>{el.remove();this.active=null;this.next()},duration);
  }
 }
 const matchAnimation=new MatchAnimation();

@@ -55,17 +55,22 @@ function benchPlayers(lineup){
  const seen=new Set();
  return [...(lineup.bench||[]).filter(p=>!p.subbed_in||p.subbed_out||p.red),...(lineup.starters||[]).filter(p=>p.subbed_out||p.red)].filter(p=>{const key=p.id||p.name;if(seen.has(key))return false;seen.add(key);return true});
 }
+function formationCoachHTML(s,side){
+  const manual=s.coach_overrides?.[side];
+  const candidates=(manual?[manual]:[s.ge?.ready?s.ge.coaches?.[side]:null,s.coaches?.[side],s.catalog_coaches?.[side]]).filter(c=>c?.name);
+  const coach=candidates.find(c=>c.name===candidates[0]?.name&&formationPhoto(c.photo))||candidates[0];
+  const coachPhoto=formationPhoto(coach?.photo);
+  return `<footer class="formation-coach"><span>TÉCNICO</span>${coachPhoto?`<img class="formation-coach-photo" src="${esc(coachPhoto)}" alt="" onerror="this.hidden=true">`:""}<strong>${esc(coach?.name||'Não informado pela fonte')}</strong>${coach?.source?`<small>Fonte: ${esc(coach.source)}</small>`:''}</footer>`;
+}
 function formationBenchHTML(s){
  return ['home','away'].map(side=>{
   const lineup=s.lineups?.[side],players=benchPlayers(lineup||{});
-  const candidates=[s.ge?.ready?s.ge.coaches?.[side]:null,s.coaches?.[side],s.catalog_coaches?.[side]].filter(c=>c?.name);
-  const coach=candidates.find(c=>c.name===candidates[0]?.name&&formationPhoto(c.photo))||candidates[0];
-  const coachPhoto=formationPhoto(coach?.photo);
-  return `<section class="formation-bench-team"><header><span class="eyebrow">BANCO E SAÍDAS</span><h3>${esc(s[side]?.name||'Time')}</h3></header><div class="formation-bench-grid">${players.length?players.map(p=>formationPlayer(s,p,side)).join(''):`<p class="formation-bench-empty">${lineup?.bench?.length?'Nenhum jogador fora de campo informado.':'Banco não informado pela fonte.'}</p>`}</div><footer class="formation-coach"><span>TÉCNICO</span>${coachPhoto?`<img class="formation-coach-photo" src="${esc(coachPhoto)}" alt="" onerror="this.hidden=true">`:""}<strong>${esc(coach?.name||'Não informado pela fonte')}</strong>${coach?.source?`<small>Fonte: ${esc(coach.source)}</small>`:''}</footer></section>`;
+  return `<section class="formation-bench-team"><header><span class="eyebrow">BANCO E SAÍDAS</span><h3>${esc(s[side]?.name||'Time')}</h3></header><div class="formation-bench-grid">${players.length?players.map(p=>formationPlayer(s,p,side)).join(''):`<p class="formation-bench-empty">${lineup?.bench?.length?'Nenhum jogador fora de campo informado.':'Banco não informado pela fonte.'}</p>`}</div>${formationCoachHTML(s,side)}</section>`;
  }).join('');
 }
 let formationSelected=null;
 function renderFormation(s){
+ if(typeof renderCoachControls==='function')renderCoachControls(s);
  if(typeof renderPlayerPhotoControls==='function')renderPlayerPhotoControls(s);
  const target=document.getElementById('formationPreview');if(target){target.innerHTML=formationHTML(s);document.getElementById('profileStatus').textContent=s.profile_status||'As fotos e informações são buscadas automaticamente quando a escalação chega.';
  if(formationSelected)document.getElementById('formationDetails').innerHTML=formationDetails(s,...formationSelected);}

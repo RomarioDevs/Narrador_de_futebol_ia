@@ -21,3 +21,9 @@
 @keyframes moment-title{from{opacity:0;transform:scale(.65)}to{opacity:1;transform:scale(1)}}
 @keyframes moment-progress{to{transform:scaleX(0)}}@keyframes moment-shine{from{transform:translateX(-40%)}to{transform:translateX(40%)}}
 @media(prefers-reduced-motion:reduce){.match-moment,.match-moment h2,.moment-shine,.moment-progress{animation:none}}
+.match-moment.yellow-card{background:radial-gradient(ellipse at 50% 25%,#685713,#0b1420 78%)}
+.match-moment.red-card{background:radial-gradient(ellipse at 50% 25%,#7a1f2a,#0b1420 78%)}
+.moment-card-symbol{width:34px;height:47px;border-radius:5px;background:#ffdb43;box-shadow:0 5px 18px #0005;flex-shrink:0;transform:rotate(-8deg);animation:moment-title .6s ease-out}
+.red-card .moment-card-symbol{background:#ff4155}.yellow-card h2{color:#ffdb43}.red-card h2{color:#ff7180}
+.red-card .moment-progress{background:#ff4155}.yellow-card .moment-progress{background:#ffdb43}
+@media(prefers-reduced-motion:reduce){.moment-card-symbol{animation:none}}

@@ -1,15 +1,15 @@
 {
   "background": "transparent",
   "background_color": "#e3f207",
-  "background_image": "",
+  "background_image": "/static/uploads/aa60780a1391dfaf50f84166da6903b3d9ca46c46fef01b40c818760a258c733.jpg",
   "accent": "#f2ff38",
   "away_accent": "#72aaff",
   "home_custom_colors": true,
   "away_custom_colors": true,
-  "home_photo_color": "#0951a1",
-  "home_photo_secondary": "#0951a1",
-  "away_photo_color": "#f7b72a",
-  "away_photo_secondary": "#d41e3d",
+  "home_photo_color": "#e01a1a",
+  "home_photo_secondary": "#e01a1a",
+  "away_photo_color": "#0951a1",
+  "away_photo_secondary": "#0951a1",
   "formation_home_background": "#426e50",
   "formation_away_background": "#426e50",
   "panel_opacity": 0.94,
@@ -24,5 +24,5 @@
   "home_logo": "",
   "away_logo": "",
   "channel_name": "FUTEBOL LIVE",
-  "scene": "formation"
+  "scene": "match"
 }

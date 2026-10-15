@@ -92,6 +92,7 @@ def deep_update(dst: dict, src: dict):
 
 async def broadcast():
     club_context.observe(state)
+    coach_overrides.observe()
     ge_feed.observe()
     from backend.ge_feed import apply_pregame_lineups
     apply_pregame_lineups(state)
@@ -129,6 +130,9 @@ support_feed = SupportFeed(state, broadcast)
 support_feed.install(app)
 player_photos = PlayerPhotos(BASE, state, broadcast)
 player_photos.install(app)
+from backend.coach_overrides import CoachOverrides
+coach_overrides = CoachOverrides(BASE, state, broadcast)
+coach_overrides.install(app)
 
 @app.get("/favicon.ico", include_in_schema=False, status_code=204)
 async def favicon():

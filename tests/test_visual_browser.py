@@ -27,6 +27,9 @@ class VisualBrowserTests(unittest.TestCase):
                 patch.object(main.player_photos, 'path', Path(folder) / 'player_photos.json'), \
                 patch.object(main.player_photos, 'base', Path(folder)), \
                 patch.object(main.player_photos, 'photos', {}), \
+                patch.object(main.coach_overrides, 'path', Path(folder) / 'coach_overrides.json'), \
+                patch.object(main.coach_overrides, 'base', Path(folder)), \
+                patch.object(main.coach_overrides, 'saved', {}), \
                 patch.object(main.ge_feed, 'observe'):
             (Path(folder) / 'static').mkdir()
             main.state.update(appearance=Appearance().model_dump(),
@@ -123,6 +126,21 @@ class VisualBrowserTests(unittest.TestCase):
                         control.locator('#resetPlayerPhoto').click()
                         control.wait_for_function('!document.querySelector("#controlStarters .formation-avatar img")')
                         self.assertEqual(main.player_photos.photos, {})
+                        control.locator('#coachName').fill('Manual Coach')
+                        control.locator('#coachPhotoUpload').set_input_files({'name': 'coach.png', 'mimeType': 'image/png', 'buffer': png})
+                        control.wait_for_function('Boolean(coachPhotoDraft)')
+                        control.locator('#saveCoach').click()
+                        control.wait_for_function('S.coach_overrides?.home?.name === "Manual Coach"')
+                        control.locator('.scene-controls [data-scene="bench"]').click()
+                        control.frame_locator('#preview').locator('#overlayLineups .formation-coach-photo').wait_for(state='visible')
+                        self.assertEqual(control.frame_locator('#preview').locator('#overlayLineups .formation-coach strong').first.inner_text(), 'Manual Coach')
+                        control.locator('#coachSide').select_option('away')
+                        self.assertEqual(control.locator('#coachName').input_value(), '')
+                        control.locator('#coachSide').select_option('home')
+                        self.assertEqual(control.locator('#coachName').input_value(), 'Manual Coach')
+                        control.locator('#resetCoach').click()
+                        control.wait_for_function('!S.coach_overrides?.home')
+                        self.assertEqual(main.coach_overrides.saved, {})
                     finally:
                         browser.close()
             finally:
