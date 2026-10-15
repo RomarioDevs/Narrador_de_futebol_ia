@@ -7,11 +7,13 @@ from datetime import datetime, timedelta, timezone
 import os
 import re
 from typing import Any
+from urllib.parse import urlparse
 
 import httpx
 
 
 class NewsContext:
+    TRUSTED_DOMAINS = {"fifa.com", "cbf.com.br", "ge.globo.com", "globo.com", "espn.com", "espn.com.br", "uol.com.br", "premierleague.com", "uefa.com", "conmebol.com", "fcbarcelona.com", "realmadrid.com", "liverpoolfc.com"}
     def __init__(self, state):
         self.state = state
         self.state["news_context"] = {"configured": self.configured(), "articles": [], "facts": [], "error": None}
@@ -25,6 +27,12 @@ class NewsContext:
     @staticmethod
     def clean(value, limit=500):
         return re.sub(r"\s+", " ", str(value or "")).strip()[:limit]
+
+    @classmethod
+    def trust_label(cls, url):
+        host = urlparse(url).hostname or ""
+        host = host.removeprefix("www.")
+        return "alta" if any(host == domain or host.endswith("." + domain) for domain in cls.TRUSTED_DOMAINS) else "não verificada"
 
     async def fetch(self, days=3):
         days = 7 if int(days) >= 7 else 3
@@ -50,8 +58,11 @@ class NewsContext:
             published = self.clean(item.get("publishedAt"), 40)
             if not title or not url or not source:
                 continue
-            articles.append({"title": title, "url": url, "source": source, "published_at": published, "description": self.clean(item.get("description"), 300)})
-        facts = [{"id": "news:" + str(index), "text": f"Notícia recente: {item['title']} — fonte {item['source']}, publicada em {item['published_at'] or 'data não informada'}.", "source": {"name": item["source"], "url": item["url"]}} for index, item in enumerate(articles)]
+            trust = self.trust_label(url)
+            if any(existing["title"].casefold() == title.casefold() for existing in articles):
+                continue
+            articles.append({"title": title, "url": url, "source": source, "trust": trust, "published_at": published, "description": self.clean(item.get("description"), 300)})
+        facts = [{"id": "news:" + str(index), "text": f"Notícia recente: {item['title']} — fonte {item['source']}, publicada em {item['published_at'] or 'data não informada'}.", "source": {"name": item["source"], "url": item["url"]}} for index, item in enumerate(articles) if item["trust"] == "alta"]
         self.state["news_context"] = {"configured": True, "days": days, "updated_at": datetime.now(timezone.utc).isoformat(), "articles": articles[:12], "facts": facts[:12], "error": None}
         return self.status()
 

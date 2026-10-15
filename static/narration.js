@@ -22,7 +22,7 @@ const MatchEventsCompat = typeof MatchEvents !== 'undefined' ? MatchEvents : {
 
 class MatchNarrator {
  constructor({synth=window.speechSynthesis,Utterance=window.SpeechSynthesisUtterance,onChange=()=>{},compose=null}={}) {
-  Object.assign(this,{synth,Utterance,onChange,enabled:false,previewing:false,paused:false,queue:[],utterance:null,seen:new Set(),scoreTimer:null,status:'Narração desligada.',lastText:'',voice:null,rate:1,volume:1,style:'events',commentaryInterval:90,lastCommentAt:0,customComments:[],sponsorReads:[],playerFocus:'',customIndex:0,sponsorIndex:0,commentLibraryNextAt:0});
+  Object.assign(this,{synth,Utterance,onChange,enabled:false,previewing:false,paused:false,queue:[],utterance:null,seen:new Set(),pendingConfirmations:new Map(),scoreTimer:null,status:'Narração desligada.',lastText:'',voice:null,rate:1,volume:1,style:'events',commentaryInterval:90,lastCommentAt:0,customComments:[],sponsorReads:[],playerFocus:'',customIndex:0,sponsorIndex:0,commentLibraryNextAt:0});
   this.radio=new RadioCommentary();
   this.compose=compose;this.composing=null;this.finishAfterDrain=false;
   this.lineupQueue=[];this.lineupsSeen=new Set();
@@ -90,6 +90,14 @@ class MatchNarrator {
   if(!this.enabled)throw new Error('Inicie a narração para repetir o lance.');
   this.interruptAnalysis();
   this.enqueue('Repetindo o último lance. '+this.lastEvent.text,'event',{...this.lastEvent,replay:true,text:'Repetindo o último lance. '+this.lastEvent.text,created:Date.now(),kind:'event'});
+ }
+ replay(mode='short',s=this.currentState){
+  if(!this.lastEvent)throw new Error('Nenhum lance disponível para replay.');
+  if(this.paused)throw new Error('Retome a voz para reproduzir o replay.');
+  if(!this.enabled)throw new Error('Inicie a narração para reproduzir o replay.');
+  const base=this.lastEvent.text, score=this.scoreboard(s), prefix=mode==='detail'?'Vamos rever o lance. ':mode==='tactical'?'Na leitura da jogada. ':'Replay do lance. ';
+  const suffix=mode==='detail'?` ${score}`:mode==='tactical'?` ${score} A informação é baseada no lance registrado, sem inferir movimentos não informados.`:'';
+  this.interruptAnalysis();this.enqueue(prefix+base+suffix,'event',{replay:true,urgent:true});
  }
  readStage(s=this.currentState){
   if(this.paused)throw new Error('Retome a voz para ler o roteiro.');
@@ -439,6 +447,21 @@ class MatchNarrator {
  eventKind(event){
   return MatchEventsCompat.kind(event);
  }
+ highImpact(event){
+  const kind=this.eventKind(event),text=String(event.text||'');
+  return kind==='goal'||kind==='red'||kind==='card'&&event.icon==='🟥'||/pênalti|penalty/i.test(text);
+ }
+ confirmedEvent(event,s){
+  if(!this.highImpact(event)||event.source?.name==='Lance manual'||event.editorial)return true;
+  const key=this.eventKey(event),now=Date.now(),started=this.pendingConfirmations.get(key)||now;
+  this.pendingConfirmations.set(key,started);
+  const pools=[...(s.events||[]),...(s.ge?.events||[])].filter(other=>other!==event);
+  const alternate=pools.find(other=>other.source?.name&&other.source.name!==event.source?.name&&this.eventKind(other)===this.eventKind(event)&&Math.abs((this.eventMinuteValue(other.minute)??0)-(this.eventMinuteValue(event.minute)??0))<=1);
+  const scoreSupports=this.eventKind(event)==='goal'&&this.score(s)!==this.lastScore;
+  if(alternate||scoreSupports)return true;
+  // When only one provider is available, avoid an instant false goal but do not block the live feed forever.
+  return now-started>=12000;
+ }
  update(s) {
   this.currentState=s;
   if(!this.enabled)return;
@@ -506,6 +529,8 @@ class MatchNarrator {
    const text=this.eventSpeech(event);
    if(text){
     const kind=this.eventKind(event);
+    if(!this.confirmedEvent(event,s))continue;
+    this.pendingConfirmations.delete(this.eventKey(event));
     this.seen.add(key);
     this.enqueue(text,kind,{eventKey:key,editorial:!!event.editorial,source:event.source,urgent:['cancelled','correction','review'].includes(kind)});
     if(kind==='goal')this.goalCount++;

@@ -19,3 +19,5 @@
 .match-timing{display:flex;align-items:center;justify-content:center;gap:12px;width:100%}.match-timing #matchStatus{font-size:13px;font-weight:800;color:var(--accent);line-height:1.2;text-align:right;max-width:120px;overflow-wrap:anywhere}
 
 .event-goal{background:linear-gradient(90deg,#38e8a018,transparent);border-left:3px solid #38e8a0;padding-left:10px!important}.event-review{background:linear-gradient(90deg,#72aaff18,transparent);border-left:3px solid #72aaff;padding-left:10px!important}.event-card{border-left:3px solid #ffc447;padding-left:10px!important}
+
+.chat-ranking{border-top:1px solid #ffffff12;padding:12px 20px 14px}.chat-rank-item{display:grid;grid-template-columns:24px 1fr auto;gap:8px;align-items:center;padding:5px 0;font-size:11px}.chat-rank-item>span,.chat-rank-item small{color:#8ea2be}.chat-rank-item strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

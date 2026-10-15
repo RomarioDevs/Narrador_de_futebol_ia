@@ -84,6 +84,9 @@ class NarrationSession {
    else if(command.action==='panorama')this.narrator.panorama(this.state);
    else if(command.action==='skip')this.narrator.skip();
    else if(command.action==='repeat')this.narrator.repeat(this.state);
+   else if(command.action==='replay_short')this.narrator.replay('short',this.state);
+   else if(command.action==='replay_detail')this.narrator.replay('detail',this.state);
+   else if(command.action==='replay_tactical')this.narrator.replay('tactical',this.state);
    else if(command.action==='stage')this.narrator.readStage(this.state);
   }catch(e){this.narrator.notify(e.message);}
  }
